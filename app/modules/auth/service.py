@@ -27,6 +27,7 @@ class AuthService:
         self.dummy_password_hash = dummy_password_hash
 
     async def login(self, username: str, password: str) -> TokenPair:
+        """验证用户名和密码，通过后签发访问与刷新令牌。"""
         user = await self.repository.get_by_username(username)
         valid = await verify_password(
             password,
@@ -38,6 +39,7 @@ class AuthService:
         return self.token_provider.create_pair(str(user.id))
 
     async def _authenticate(self, token: str, token_type: TokenType) -> tuple[User, TokenClaims]:
+        """验证令牌用途、撤销状态和用户状态，返回用户与声明。"""
         claims = self.token_provider.decode_token(token, token_type)
         if await self.token_store.is_revoked(claims.jti):
             raise AuthenticationException()
@@ -55,14 +57,17 @@ class AuthService:
         return user, claims
 
     async def refresh(self, refresh_token: str) -> TokenPair:
+        """重新验证刷新令牌及用户状态，签发新令牌对。"""
         user, _ = await self._authenticate(refresh_token, "refresh")
         # 默认不消费旧 refresh token；轮换与防重放需要有状态存储。
         return self.token_provider.create_pair(str(user.id))
 
     async def logout(self, access_token: str) -> None:
+        """验证访问令牌并调用撤销契约，默认空实现不撤销服务器令牌。"""
         _, claims = await self._authenticate(access_token, "access")
         await self.token_store.revoke(claims.jti, claims.exp)
 
     async def get_current_user(self, access_token: str) -> User:
+        """验证访问令牌并返回当前启用用户。"""
         user, _ = await self._authenticate(access_token, "access")
         return user

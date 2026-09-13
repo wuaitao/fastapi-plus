@@ -11,6 +11,7 @@ class SafeExceptionMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """兜底 HTTP 异常，响应已开始时继续抛出，由服务器中止连接。"""
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -18,6 +19,7 @@ class SafeExceptionMiddleware:
         response_started = False
 
         async def send_response(message: Message) -> None:
+            """跟踪响应头是否已发送，防止异常路径产生第二组响应。"""
             nonlocal response_started
             if message["type"] == "http.response.start":
                 response_started = True

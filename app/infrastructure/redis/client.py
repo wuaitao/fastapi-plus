@@ -18,6 +18,7 @@ class _RedisPing(Protocol):
 
 
 async def create_redis_client(settings: Settings) -> "Redis | None":
+    """按需创建并验证 Redis 客户端，失败时关闭连接池并隐藏底层错误。"""
     if not settings.redis_enabled:
         return None
     try:

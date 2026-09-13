@@ -24,10 +24,30 @@ def configure_logging(settings: Settings) -> None:
         structlog.processors.TimeStamper(fmt="iso", utc=True),
     ]
     renderer = (
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(ensure_ascii=False)
         if log_format == "json"
         else structlog.dev.ConsoleRenderer(colors=False)
     )
+    handlers: dict[str, dict[str, object]] = {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": settings.log_level,
+            "stream": "ext://sys.stderr",
+            "formatter": "structured",
+        }
+    }
+    if settings.log_file_path is not None:
+        # 文件输出显式启用；轮转使用标准库，同一路径仅供单个进程写入。
+        settings.log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        handlers["file"] = {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": settings.log_level,
+            "filename": str(settings.log_file_path),
+            "maxBytes": settings.log_file_max_bytes,
+            "backupCount": settings.log_file_backup_count,
+            "encoding": "utf-8",
+            "formatter": "json",
+        }
     logging.config.dictConfig(
         {
             "version": 1,
@@ -41,17 +61,20 @@ def configure_logging(settings: Settings) -> None:
                         redact_sensitive_fields,
                         renderer,
                     ],
-                }
+                },
+                # 文件固定为逐行 JSON，便于检索；两种输出共用脱敏与上下文处理。
+                "json": {
+                    "()": structlog.stdlib.ProcessorFormatter,
+                    "foreign_pre_chain": [structlog.stdlib.ExtraAdder(), *shared],
+                    "processors": [
+                        structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                        redact_sensitive_fields,
+                        structlog.processors.JSONRenderer(ensure_ascii=False),
+                    ],
+                },
             },
-            "handlers": {
-                "console": {
-                    "class": "logging.StreamHandler",
-                    "level": settings.log_level,
-                    "stream": "ext://sys.stderr",
-                    "formatter": "structured",
-                }
-            },
-            "root": {"handlers": ["console"], "level": settings.log_level},
+            "handlers": handlers,
+            "root": {"handlers": list(handlers), "level": settings.log_level},
             "loggers": {
                 "uvicorn": {"handlers": [], "propagate": True},
                 "uvicorn.error": {"handlers": [], "propagate": True},

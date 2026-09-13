@@ -15,6 +15,7 @@ from app.core.logging.config import configure_logging
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    """根据配置装配独立 Web 应用，资源启停由 lifespan 管理。"""
     settings = settings if settings is not None else get_settings()
     configure_logging(settings)
     app = FastAPI(

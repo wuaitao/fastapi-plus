@@ -12,4 +12,5 @@ from app.modules.user.service import UserService
 
 
 def get_user_service(session: Annotated[AsyncSession, Depends(get_session)]) -> UserService:
+    """使用请求独立 Session 和共享哈希器构造用户服务。"""
     return UserService(UserRepository(session), get_password_hasher())

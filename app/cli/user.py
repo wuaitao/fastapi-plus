@@ -11,6 +11,7 @@ from app.modules.user.schema import UserCreate
 
 
 async def _create(settings: Settings, data: UserCreate) -> int:
+    """通过独立用户服务创建管理员并返回数据库生成的 ID。"""
     async with user_service(settings) as service:
         return (await service.create_superuser(data)).id
 

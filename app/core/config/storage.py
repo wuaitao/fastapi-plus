@@ -25,6 +25,7 @@ class StorageSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_storage(self) -> Self:
+        """要求所选云后端具备对应配置，本地后端不要求云凭据。"""
         if self.storage_backend == "oss" and self.storage_oss is None:
             raise ValueError("OSS 默认后端需要配置 STORAGE_OSS")
         if self.storage_backend == "cos" and self.storage_cos is None:

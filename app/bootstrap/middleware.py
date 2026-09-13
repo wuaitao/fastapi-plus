@@ -9,6 +9,7 @@ from app.core.logging.context import RequestContextMiddleware
 
 
 def register_middleware(app: FastAPI, settings: Settings) -> None:
+    """集中装配请求上下文、可选跨域和安全异常边界。"""
     # 后注册的层先接收请求：上下文 → CORS → 安全异常兜底 → 路由。
     # 预检也有请求 ID/日志，未知异常先转响应再附加跨域头。
     app.add_middleware(SafeExceptionMiddleware)

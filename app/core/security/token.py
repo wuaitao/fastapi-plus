@@ -38,6 +38,7 @@ class TokenProvider:
         self.refresh_expires_in = refresh_expires_in
 
     def create_token(self, subject: str, token_type: TokenType) -> str:
+        """按令牌用途设置有效期，以固定 HS256 签发带唯一 jti 的 JWT。"""
         issued_at = int(datetime.now(UTC).timestamp())
         lifetime = self.access_expires_in if token_type == "access" else self.refresh_expires_in
         claims = TokenClaims(
@@ -46,6 +47,7 @@ class TokenProvider:
         return jwt.encode(claims.model_dump(), self.secret.get_secret_value(), algorithm="HS256")
 
     def create_pair(self, subject: str) -> TokenPair:
+        """为同一主体签发独立的访问令牌和刷新令牌。"""
         return TokenPair(
             access_token=self.create_token(subject, "access"),
             refresh_token=self.create_token(subject, "refresh"),
@@ -53,6 +55,7 @@ class TokenProvider:
         )
 
     def decode_token(self, token: str, expected_type: TokenType) -> TokenClaims:
+        """验证签名、时间及声明类型，无效或用途不匹配时抛认证异常。"""
         try:
             payload = jwt.decode(
                 token,

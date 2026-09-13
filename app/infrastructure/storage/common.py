@@ -14,6 +14,7 @@ T = TypeVar("T")
 
 
 def object_key(key: str, visibility: Visibility) -> str:
+    """校验跨平台安全的对象键，并添加 public 或 private 前缀。"""
     # 同时拒绝 POSIX/Windows 跳转、盘符、设备名和 URL 二次解码歧义。
     parts = key.split("/")
     reserved = {"CON", "PRN", "AUX", "NUL"} | {
@@ -34,10 +35,12 @@ def object_key(key: str, visibility: Visibility) -> str:
 
 
 def attachment(filename: str) -> str:
+    """生成支持中文文件名的附件下载头。"""
     return f"attachment; filename*=UTF-8''{quote(filename, safe='')}"
 
 
 async def storage_io(call: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    """在线程执行阻塞存储操作，等待取消清理并统一转换厂商错误。"""
     try:
         # 等待线程退出后再传播取消，避免调用者关闭仍被 SDK 使用的上传流。
         task = asyncio.create_task(asyncio.to_thread(call, *args, **kwargs))

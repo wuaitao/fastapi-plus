@@ -19,6 +19,7 @@ from app.infrastructure.diagnostics import (
 
 
 async def _diagnose(settings: Settings, heads: set[str]) -> bool:
+    """逐项只读检查资源和迁移，汇总结果且不因单项失败提前退出。"""
     healthy = True
     try:
         current = set(await current_heads(settings))

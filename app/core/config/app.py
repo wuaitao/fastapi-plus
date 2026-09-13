@@ -25,6 +25,7 @@ class AppSettings(BaseSettings):
     @field_validator("cors_allow_origins")
     @classmethod
     def validate_cors_origins(cls, origins: tuple[str, ...]) -> tuple[str, ...]:
+        """校验浏览器来源白名单，拒绝通配符和无法精确匹配的 URL。"""
         for origin in origins:
             # 浏览器 Origin 只有协议、主机和可选端口；拒绝会导致匹配失效的路径等内容。
             parsed = urlsplit(origin)

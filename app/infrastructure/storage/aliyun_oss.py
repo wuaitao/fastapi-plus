@@ -29,6 +29,7 @@ class AliyunOSSStorage:
     async def put(
         self, key: str, content: BinaryIO, *, size: int, content_type: str, visibility: Visibility
     ) -> StoredObject:
+        """将流上传到 OSS，按可见性设置对象前缀和 ACL。"""
         remote_key = object_key(key, visibility)
         await storage_io(
             self._client.put_object,
@@ -44,17 +45,20 @@ class AliyunOSSStorage:
         return StoredObject(key, size)
 
     async def exists(self, key: str, *, visibility: Visibility) -> bool:
+        """查询 OSS 对象存在性，调用异常交给存储边界转换。"""
         return bool(
             await storage_io(self._client.is_object_exist, self.bucket, object_key(key, visibility))
         )
 
     async def delete(self, key: str, *, visibility: Visibility) -> None:
+        """幂等删除 OSS 对象，保留存储失败语义。"""
         await storage_io(
             self._client.delete_object,
             self._sdk.DeleteObjectRequest(bucket=self.bucket, key=object_key(key, visibility)),
         )
 
     async def access(self, key: str, *, visibility: Visibility, filename: str) -> RemoteAccess:
+        """签发五分钟有效的下载 URL，并附带原始下载文件名。"""
         result = await storage_io(
             self._client.presign,
             self._sdk.GetObjectRequest(

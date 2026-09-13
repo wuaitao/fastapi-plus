@@ -1,91 +1,117 @@
-# FastAPI Plus 工作约定
+# FastAPI Plus：AI 开发指南
 
-本文件是 Codex 与贡献者的操作契约，设计细节见 [README 文档导航](README.md#文档导航)。
-坚持 Lightweight、Explicit、Modular、Replaceable、Predictable；采用 Template-first。
+这是用于直接开发业务应用的 FastAPI 模板，应用代码属于当前项目。用户提出业务需求时，在现有模块化结构中实现；不要恢复脚手架开发阶段的路线图、审计报告或阶段测试。
 
-## 开始前与范围
+先阅读 [README.md](README.md) 中的配置、使用和二开说明，再检查任务相关代码。`docs/` 和 `tests/` 初始仅含占位文件，后续只添加当前业务确需的说明和测试。
 
-1. 阅读本文件、[roadmap](docs/roadmap.md)和任务相关设计，检查现有代码与测试。
-2. 明确假设、最小变更和验证方式；歧义按最终产品范围处理并报告。
-3. 不重设计架构、不改无关内容、不提前实现后续里程碑。当前交付为 M9 Release Hardening。
-4. 生成代码、配置或查询库 API 时使用 Context7 核实；不可用时说明并查官方资料。
+## 快速操作
 
-## 架构与职责
-
-运行方向：Router / CLI / Celery Task → Service → Repository / Provider → Infrastructure。
-Infrastructure 实现 Provider 契约；契约不反向导入 Adapter，Bootstrap 显式装配。
-
-- **Router**：解析 HTTP、声明依赖和认证授权、调用 Service、序列化 Schema。
-  不写 SQL、业务流程或厂商 SDK，不逐路由重复捕获业务异常。
-- **Service**：业务规则、协调 Repository/Provider、返回 ORM 或应用结果。
-  拥有业务 commit/rollback；不依赖 Request、Depends、HTTPException、JSONResponse 或厂商实现。
-- **Repository**：SQLAlchemy 数据访问、add/flush/refresh、返回 ORM。
-  永不 commit，不做权限、HTTP 或业务流程。
-- **Provider**：最小稳定应用能力契约；**Infrastructure**：具体实现与资源集成。
-  SDK 类型和阻塞细节留在 Adapter。
-- **Bootstrap**：工厂、显式路由/Provider 注册、生命周期；不初始化业务数据。
-  请求/任务使用独立 Session，入口关闭资源，Service 完成事务。
-- 业务按模块组织，模块依赖和错误放模块内，跨领域依赖放 Core/Infrastructure。
-  CLI、Worker 复用 Service，独立装配，不导入全局 Web app。
-
-详情见 [architecture](docs/architecture.md)、[database](docs/database.md)、
-[extensions](docs/extensions.md)和[参考模块](docs/reference-modules.md)。
-
-## 契约与安全
-
-- Service 抛应用异常；稳定描述符包含数字 code、key、安全 message、HTTP status。
-  未知异常集中处理，Router 不重复转换。
-- JSON 业务 API 使用 code/message/data，保留 HTTP 语义及自定义 422；
-  下载、流、重定向等不强制封装。见 [api](docs/api.md)、[errors](docs/errors.md)。
-- 默认 SQLite、Local，支持 MySQL/PostgreSQL 与 OSS/COS；Redis/Celery 可选且默认关闭。
-  未安装且未启用的可选能力不得影响核心。
-- ID 默认数据库生成整数，禁止默认 Snowflake；Schema 按需字符串化。
-  模型变更附迁移；启动不自动 migrate/create_all/创建管理员。
-- 禁止默认凭据、硬编码生产秘密、输出密码/Token/SQL/SDK 内部错误。
-  配置仅通过配置层读取，生产安全配置 fail fast。
-- 私有文件不公开挂载，原始文件名不作路径；存储与数据库失败采用明确补偿。
-  Celery 使用 JSON 参数、独立 Worker 和集中异步桥接。
-- 日志使用 structlog，敏感值脱敏，不默认记录完整请求/响应体，不用 print。
-
-## 依赖、代码与非目标
-
-Python >= 3.11，完整类型标注，非显然逻辑附清晰中文注释。
-只增加当前任务确需的依赖，先检查标准库、现有库、维护状况、许可证与平台成本。
-声明和 uv.lock 一起更新；运行时与开发依赖分开。
-
-Ruff 负责 lint/format/import 排序，Pyright 负责类型，Pytest 负责测试。
-不引入 Black/isort/flake8/Mypy/Loguru/Poetry 等重复主工具。
-不重新包装 FastAPI、SQLAlchemy、Alembic、Pydantic 或 Celery。
-
-v0.1 不扩展 Docker/Kubernetes、前端、完整 RBAC、菜单、部门、租户、工作流、
-CRUD 生成器、通用 CRUD Service/Router、自动路由扫描、复杂 IoC、插件市场、
-SSO/OAuth/OIDC 或监控平台。仅 auth/user/file 参考模块。
-详情见 [coding-convention](docs/coding-convention.md)与 [roadmap](docs/roadmap.md)。
-
-## 测试与质量命令
-
-行为变更有相应测试；缺陷先复现，后修复。
-按 unit/integration/api 分层；不 Mock 被测组件。
-Repository 使用真实 SQLAlchemy，Local 使用临时文件系统，云 SDK 边界可模拟。
-发布前必须验证三数据库迁移与核心集成；API 变更检查 OpenAPI。
-
-先运行 `uv sync`，激活 .venv 后执行（或分别加 `uv run` 前缀）：
+在项目根目录执行，Python ≥ 3.11，使用 uv 管理 `.venv`：
 
 ```bash
-ruff check .
-ruff format --check .
-pyright
-pytest
+uv sync --locked
+uv run python -c "from pathlib import Path; Path('data/storage').mkdir(parents=True, exist_ok=True)"
+uv run fastplus db upgrade
+uv run fastplus create-superuser
+uv run uvicorn app.main:app --reload
 ```
 
-不删除测试、放宽断言或用 skip/xfail、广泛 ignore/noqa 掩盖问题。
-测试隔离、覆盖要求见 [testing](docs/testing.md)。
+初始化数据库和管理员是显式操作，后续启动不重复创建。管理员命令需要交互终端，不预设密码。已有业务数据库的迁移与账号修改须按用户授权范围执行。
 
-## Definition of Done
+默认 SQLite + Local，Redis/Celery 关闭。按需要安装 `postgresql`、`mysql`、`oss`、`cos`、`redis`、`celery` extras；生产安装加 `--no-dev`。选好安装环境后用 `uv run --no-sync ...`，避免重新同步移除 extras 或引入开发依赖。
 
-- [ ] 仅当前任务范围，架构边界完整，无无关重构或多余依赖。
-- [ ] 类型与中文说明完整，适用行为测试已更新。
-- [ ] 模型迁移、API/OpenAPI、文档按变更同步。
-- [ ] uv sync、Ruff lint/format、Pyright、适用 Pytest 全通过。
-- [ ] 无秘密泄漏、默认凭据或运行数据入库。
-- [ ] 完整审查差异，报告文件、决策、依赖、真实验证结果与未解决事项。
+```bash
+uv run --no-sync fastplus --help
+uv run --no-sync fastplus version
+uv run --no-sync fastplus doctor
+uv run --no-sync fastplus db current
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pyright
+# 已有业务测试时执行；初始空目录的退出码 5 不代表通过
+uv run --no-sync pytest
+```
+
+Ruff 同时负责 lint、导入排序和格式，Pyright 使用 strict。按需执行 `ruff format`。不要添加重复主工具或用 skip/xfail、放宽断言、广泛 ignore/noqa 隐藏问题。
+
+## 代码导航
+
+| 任务 | 入口 |
+| --- | --- |
+| Web 创建与资源启停 | `app/bootstrap/application.py`、`lifespan.py` |
+| 新增/调整业务路由 | `app/bootstrap/routers.py`，默认 `/api/v1` |
+| 中间件顺序及 CORS | `app/bootstrap/middleware.py` |
+| 配置字段与来源 | `app/core/config/`，由 `settings.py` 组合 |
+| 统一响应与分页 | `app/common/response.py`、`pagination.py` |
+| 应用错误、HTTP 转换 | `app/core/exceptions/` |
+| 日志配置与脱敏 | `app/core/logging/` |
+| JWT、密码、权限策略 | `app/core/security/` |
+| 当前用户与身份依赖 | `app/modules/auth/dependencies.py` |
+| 数据库、Session、Repository | `app/database/` |
+| Alembic 模型发现 | `app/database/metadata.py`，必须显式导入模型 |
+| 完整业务模块参考 | `app/modules/user/` |
+| 跨存储业务与补偿参考 | `app/modules/file/` |
+| 能力契约与实现 | `app/providers/`、`app/infrastructure/` |
+| 能力实例选择 | `app/bootstrap/providers.py` |
+| CLI 注册与独立资源 | `app/cli/main.py`、`app/bootstrap/cli.py` |
+| Worker 注册与任务资源 | `app/bootstrap/worker.py`、`app/infrastructure/celery/` |
+
+存在 `.codegraph/` 且工具可用时优先用 CodeGraph 定位调用链和影响范围，再读取索引未覆盖的细节；没有可用索引时使用正常代码搜索，不把建索引作为开发前置条件。生成代码、配置或使用库 API 时用 Context7 核实；不可用时说明并查官方文档。
+
+## 实现业务的方法
+
+运行方向：`Router / CLI / Task → Service → Repository / Provider → Infrastructure`。
+
+- **Router** 解析 HTTP、声明认证授权依赖、调用 Service、序列化 Schema。不写 SQL、业务事务或厂商 SDK 调用，不逐路由重复捕获业务异常。
+- **Service** 负责业务规则、协调依赖以及 commit/rollback，返回 ORM 或应用结果。不得依赖 Request、Depends、HTTPException、JSONResponse 或具体厂商 SDK。认证与用户管理沿用现有 Service，不另写一套逻辑。
+- **Repository** 使用 SQLAlchemy 查询、add/flush/refresh，永不 commit，不做 HTTP、权限或业务流程。已有最小 BaseRepository 可用，复杂查询直接放模块 Repository。
+- **Provider** 是最小应用能力契约。Infrastructure 实现它，契约不反向导入 Adapter；SDK 类型和阻塞调用留在 Adapter。
+- **Bootstrap** 显式选择实现并装配，不自动扫描路由或模型，不启动业务任务、建表或初始化账号。
+
+新增模块放 `app/modules/<name>/`，必须包含 `__init__.py`。按实际需要创建 model/schema/repository/service/router/dependencies/errors，避免空壳文件。注册路由到 `bootstrap/routers.py`，模型导入到 `database/metadata.py`，数据库变更新增 Alembic 迁移：
+
+```bash
+uv run --no-sync fastplus db revision -m "describe change" --autogenerate
+# 审阅生成结果后，在专用开发数据库验证
+uv run --no-sync fastplus db upgrade
+```
+
+保留已有迁移，不重写已经应用的版本。数据库主键默认整数，按需在响应 Schema 中序列化为字符串。模型时间使用 `TimestampMixin` / `UTCDateTime`，写入值带时区；直接 SQL 写入需自行维护时间字段。
+
+请求和任务各有独立 Session，入口关闭资源，Service 完成事务。身份查询使用独立短 Session，返回用户快照；不要跨请求共享 Session，或通过身份快照修改用户。阻塞密码哈希和 SDK 调用复用已有线程边界；任务复用集中异步桥接，不在每个任务内另建事件循环。
+
+新增任务参考 `modules/user/tasks.py`，在 Worker 工厂显式注册。仅传简单 JSON 参数和结果，业务提交后再投递；数据库与 Broker 不具备原子提交。为可能重复执行的任务实现业务幂等，只重试明确的暂时性故障。
+
+## 配置、API 与安全边界
+
+配置只能从 `Settings` 获取，业务模块不自行读取环境变量。来源优先级为构造参数 > 环境变量 > 根目录 `.env` > 默认值。普通字段平铺，云存储嵌套变量使用双下划线。新字段加入对应配置分组，同步 `.env.example` 和必要的 README 说明。
+
+生产必须提供至少 32 字节随机 `JWT_SECRET` 并关闭 DEBUG。开发临时密钥重启失效，多进程使用相同固定秘密。密码、Token、连接串和云密钥不得硬编码、记录或提交。
+
+JSON 业务 API 返回 `code/message/data`，错误包含 `request_id`，保留 HTTP 状态码及自定义 422。文件、流、重定向不强制包装。模块错误用唯一数字 code、key、安全 message、status_code 描述，Service 抛应用异常。未知异常集中处理，不回显异常正文。
+
+权限入口为 `check_permission` / `require_permission`，默认只允许超级管理员。业务需要细粒度权限时在此按授权范围扩展，不把 `is_superuser` 规则误认为已有完整 RBAC。默认 `NullTokenStore` 不撤销令牌，退出要求客户端清理，刷新不提供防重放。
+
+CORS 默认关闭，只接受明确来源；新增方法/请求头时检查原生中间件允许列表。请求顺序为请求上下文 → 可选 CORS → 安全异常边界 → 框架与路由，预检和错误响应都应保留请求 ID。流开始后失败应中止，不能发送第二个 JSON 响应。
+
+私有文件不得公开静态挂载，原始文件名不作路径。读取和删除必须经过 Service 授权，历史对象按记录中的 backend/key 定位。保留上传失败补偿及取消时等待线程结束的逻辑；数据库回滚无法恢复已经删除的对象。
+
+## 日志使用
+
+业务通过 `structlog.get_logger(__name__)` 获取 logger，使用稳定事件名和安全结构化字段，不自行注册 Handler 或使用 print。非显然逻辑附中文说明，公共操作的 docstring 应交代用途、事务或副作用，避免只复述函数名。
+
+默认输出 stderr；`LOG_FILE_PATH` 显式启用 UTF-8 JSON 文件日志，大小与备份数由 `LOG_FILE_MAX_BYTES`、`LOG_FILE_BACKUP_COUNT` 控制。两种输出共用上下文与脱敏。
+
+轮转文件必须由单进程独占，Web/CLI/solo Worker 并行运行需使用不同路径；多 Worker 或 prefork 使用 stderr 和外部收集，取消文件配置。时间保持 UTC；用响应 `X-Request-ID` 查 `request.completed` / `request.failed`，任务用 correlation_id/task_id 关联。不要为排障关闭脱敏或输出完整秘密配置。
+
+## 变更与验证
+
+先说明任务假设、最小修改和验证方式。保持脚手架通用性，只增加当前业务确需的能力，不为未来需求预装服务、创建复杂 IoC 或通用 CRUD 框架。用户要求的新业务不受旧里程碑范围限制。
+
+行为修改在 `tests/` 添加对应业务测试，缺陷先复现再修复。可按 unit/integration/api 分层，目录按需创建；Repository 使用真实 SQLAlchemy，Local 使用临时文件系统，云 SDK 可在边界模拟。测试隔离 `.env`、Settings 缓存、进程日志与资源，不连接生产。
+
+涉及模型时验证迁移，涉及 API 时检查实际响应和 OpenAPI，涉及外部服务时明确哪些做了真实验证。运行适用的 Ruff、Pyright、Pytest；没有业务测试时报告实际冒烟验证，不宣称全量测试通过。
+
+新增依赖同步 `pyproject.toml` 和 `uv.lock`，优先标准库及已有能力，运行依赖和 dev 分开。修改包名时同步应用工厂、CLI 的元数据查询；修改版本后重新安装当前项目。
+
+完成后审查 diff，报告行为变化、文件、真实验证结果和剩余限制。运行数据、日志、密钥、缓存、临时验证脚本不提交；业务文档和测试按需保留，README 与 AGENTS 不再承载开发阶段的过程报告。

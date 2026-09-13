@@ -37,6 +37,7 @@ class Settings(
 
     @model_validator(mode="after")
     def validate_configuration(self) -> Self:
+        """检查生产环境的跨配置约束：关闭调试并提供固定密钥。"""
         if self.environment == Environment.PRODUCTION and self.debug:
             raise ValueError("生产环境禁止启用 DEBUG")
         if self.environment == Environment.PRODUCTION and self.jwt_secret is None:

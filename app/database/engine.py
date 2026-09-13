@@ -12,6 +12,7 @@ from app.core.config import Settings
 
 
 def create_engine(settings: Settings, *, null_pool: bool = False) -> AsyncEngine:
+    """按配置创建异步引擎，可为短期 CLI 或任务资源禁用连接池。"""
     try:
         engine = create_async_engine(
             settings.sqlalchemy_url,
@@ -38,6 +39,7 @@ class _SQLiteConnection(Protocol):
 
 
 def _configure_sqlite(connection: _SQLiteConnection, record: ConnectionPoolEntry) -> None:
+    """开启 SQLite 外键约束，并将事务起点交给 SQLAlchemy。"""
     # 关闭驱动的旧式事务控制，让 SELECT、DDL、SAVEPOINT 也受真实事务保护。
     connection.isolation_level = None
     cursor = connection.cursor()
@@ -46,4 +48,5 @@ def _configure_sqlite(connection: _SQLiteConnection, record: ConnectionPoolEntry
 
 
 def _begin_sqlite(connection: Connection) -> None:
+    """显式发出 BEGIN，使读取和 DDL 也遵守事务边界。"""
     connection.exec_driver_sql("BEGIN")

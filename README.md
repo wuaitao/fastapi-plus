@@ -1,189 +1,321 @@
 # FastAPI Plus
 
-一个轻量、面向生产的 FastAPI 后端 Starter。采用 **Template-first** 产品形态：
-通过克隆仓库或使用模板开始，应用代码留在项目中，便于阅读、修改和替换。
+轻量、模块化的 FastAPI 后端脚手架。复制或克隆项目后即可开始业务开发，应用代码、配置和迁移保留在项目中，便于理解、修改和替换。
 
-> Secure by default. Extensible by design. Minimal in core. Explicit is better than magic.
+默认使用 SQLite 和本地文件存储，无需额外服务。内置用户管理、JWT 认证、文件上传下载、数据库迁移、结构化日志和项目 CLI；MySQL、PostgreSQL、OSS、COS、Redis、Celery 按需启用。
 
-## 当前状态：M9 — Release Hardening
+技术栈：Python ≥ 3.11、FastAPI、Pydantic Settings、SQLAlchemy async、Alembic、structlog、Typer。依赖由 `uv.lock` 锁定，Ruff、Pyright、Pytest 用于业务开发质量检查。
 
-当前已实现应用工厂、类型化配置、集中 Lifespan、显式路由注册和 `GET /health`，
-以及 structlog、请求 ID、泛型响应/分页、应用异常与全局异常处理。
-M3 已加入 SQLAlchemy async、独立 Session、UTC 时间字段、最小 Repository 和 Alembic。
-M4 已加入完整 User 参考模块、Argon2id 密码哈希、唯一冲突处理和 users 表迁移。
-M5 已加入 JWT access/refresh、登录/刷新/退出/当前用户、Bearer 依赖及用户管理权限。
-M6 已加入 StorageProvider/Registry、Local/OSS/COS、文件 API、files 迁移和失败补偿。
-M7 已加入可选 Redis/Celery、独立 Worker、集中异步桥接和一个用户状态查询任务。
-M8 已加入 Typer CLI：版本、只读诊断、Alembic 命令和交互创建超级管理员。
-M9 补齐三数据库发布流程测试、覆盖率门槛、OpenAPI 完整性与架构边界检查，并整理发布文档。
-测试覆盖配置、生命周期、Health、422/404/405/500、日志脱敏、并发上下文和 OpenAPI。
-版本 `0.1.0.dev0` 表示开发中的基础仓库，并非已发布的 v0.1。
+## 代码结构
 
-**Redis/Celery 默认关闭；用户管理接口要求超级管理员权限。**
-`alembic/`、`alembic.ini` 可执行显式 users/files 迁移，不自动创建管理员；
-`.env.example` 列出可选配置，默认无需创建 `.env` 或填写密钥。
-开发未配置 JWT_SECRET 时使用实例级随机临时密钥，重启后旧令牌失效；生产必须配置
-至少 32 字节的随机秘密。默认退出不撤销服务器令牌，客户端应删除 access/refresh。
-没有默认管理员，也没有自助注册端点；使用 `uv run fastplus create-superuser` 创建管理员。
-接口输入与状态码见 [API 契约](docs/api.md)，实际兼容性和待发布事项见 [发布验收](docs/release.md)。
+```text
+.
+├── app/
+│   ├── main.py                    # Web 入口
+│   ├── bootstrap/                 # 显式装配与生命周期
+│   │   ├── application.py         # create_app 应用工厂
+│   │   ├── lifespan.py            # 创建和释放应用资源
+│   │   ├── routers.py             # 业务路由与 /health
+│   │   ├── middleware.py          # 请求上下文、CORS、安全异常边界
+│   │   ├── exceptions.py          # 注册异常处理器
+│   │   ├── providers.py           # 装配认证及存储能力
+│   │   ├── cli.py                 # CLI 资源与错误处理
+│   │   └── worker.py              # 独立 Celery Worker 入口
+│   ├── core/
+│   │   ├── config/                # 按能力分组的类型化配置
+│   │   ├── exceptions/            # 错误描述符与统一异常响应
+│   │   ├── logging/               # 控制台、文件日志、请求 ID、脱敏
+│   │   └── security/              # 密码哈希、JWT、权限策略入口
+│   ├── common/                    # 通用响应与分页结构
+│   ├── database/                  # Base、引擎、Session、最小 Repository
+│   │   └── metadata.py            # Alembic 显式模型导入入口
+│   ├── providers/                 # 存储和令牌撤销契约
+│   ├── infrastructure/            # 契约实现与外部资源集成
+│   │   ├── storage/               # Local、Aliyun OSS、Tencent COS
+│   │   ├── redis/                 # 可选异步 Redis 客户端
+│   │   └── celery/                # 任务配置、基类、信号、异步桥接
+│   ├── modules/                   # 业务按模块组织
+│   │   ├── auth/                  # 登录、刷新、退出、当前用户
+│   │   ├── user/                  # 用户 CRUD，完整模块参考
+│   │   └── file/                  # 上传、元数据、授权下载、删除
+│   └── cli/                       # fastplus 命令
+├── alembic/                       # 迁移环境、模板及版本，须随项目保留
+├── docs/                          # 留给业务项目文档
+├── tests/                         # 留给业务项目测试
+├── .env.example                   # 配置示例，无真实秘密
+├── .gitattributes                 # Python 文件使用 LF 换行
+├── .gitignore
+├── AGENTS.md                      # AI 开发导航与操作约定
+├── alembic.ini
+├── pyproject.toml
+├── uv.lock
+└── LICENSE
+```
 
-## 启动应用
+运行时的 `data/`（数据库、文件）和 `logs/`（可选日志）不进入版本控制。`docs/`、`tests/` 初始仅含占位文件，按实际业务添加内容。
 
-安装 Python >= 3.11 和 [uv](https://docs.astral.sh/uv/getting-started/installation/)，
-克隆仓库或使用模板后，在仓库根目录执行：
+## 安装与启动
+
+安装 Python ≥ 3.11 和 [uv](https://docs.astral.sh/uv/getting-started/installation/)，复制或克隆完整项目，在项目根目录执行：
 
 ```bash
-uv sync
+uv sync --locked
+```
+
+按需将 `.env.example` 复制为 `.env`，修改项目名称、数据库和日志等配置。PowerShell 使用 `Copy-Item .env.example .env`，Linux/macOS 使用 `cp .env.example .env`；已有 `.env` 时直接编辑。
+
+首次初始化需创建数据目录，再显式迁移和创建管理员：
+
+```bash
+uv run python -c "from pathlib import Path; Path('data/storage').mkdir(parents=True, exist_ok=True)"
 uv run fastplus db upgrade
 uv run fastplus create-superuser
+uv run fastplus doctor
 uv run uvicorn app.main:app --reload
 ```
 
-管理员用户名、可选邮箱和密码由 CLI 交互输入；密码隐藏并要求确认。
-迁移和管理员创建均须显式执行，重复启动服务器不需要重复创建账号。
+管理员用户名、可选邮箱及密码由终端交互输入，密码隐藏并二次确认。没有默认账号、默认密码或自助注册接口。后续启动只需运行 Uvicorn，新增迁移时再执行升级。
 
-访问 `http://127.0.0.1:8000/health`，返回 `{"status":"ok"}`。
-交互文档位于 `/docs`、`/redoc`，OpenAPI 位于 `/openapi.json`。
-`OPENAPI_ENABLED=false` 可独立关闭这些文档入口。
-业务项目可通过 `APP_TITLE`、`APP_SUMMARY`、`APP_DESCRIPTION` 设置文档名称和说明。
-跨域浏览器接入使用 `CORS_ALLOW_ORIGINS` 明确来源白名单，默认关闭；示例与边界见
-[跨域配置](docs/configuration.md#业务名称与浏览器跨域)。
-`LOG_FORMAT=json` 可切换 JSON 日志；未指定时开发/测试使用 console，生产使用 JSON。
-所有 HTTP 响应携带 `X-Request-ID`；Health 响应体保持原格式。
-配置来源、变量名及当前校验边界见 [configuration](docs/configuration.md)。
-数据库默认 SQLite，支持可选安装 PostgreSQL/MySQL 驱动；配置、Session 用法和
-显式 Alembic 命令见 [database](docs/database.md)。应用启动不连接数据库、不建表或迁移。
+| 地址 | 用途 |
+| --- | --- |
+| `http://127.0.0.1:8000/health` | 存活检查，返回 `{"status":"ok"}` |
+| `http://127.0.0.1:8000/docs` | Swagger UI，可直接调试接口 |
+| `http://127.0.0.1:8000/redoc` | ReDoc 接口文档 |
+| `http://127.0.0.1:8000/openapi.json` | OpenAPI 定义 |
 
-文件默认写入 `data/storage/private`，上传需登录；私有文件仅所有者或超级管理员可读写。
-公开文件支持匿名下载，所有文件删除仍需所有者或超级管理员权限。
-默认最大 10 MiB，支持 txt/pdf/png/jpg/jpeg/bin；接口、类型约束和云配置见 [storage](docs/storage.md)。
-默认 `uv sync` 不安装云 SDK；按需使用 `uv sync --extra oss` 或 `uv sync --extra cos`。
+这些 HTTP 文档入口由 FastAPI 生成，与仓库的 `docs/` 目录无关。
 
-默认应用不要求 Redis 服务或 Worker。部署使用 `uv sync --no-dev` 时不安装 Redis/Celery，
-按需加 `--extra redis` 或 `--extra celery`；开发组安装任务测试所需的 Celery/Redis 和类型桩。
-开关、连接配置、独立 Worker 启动和唯一示例任务见 [Celery 与异步任务](docs/celery.md)。
+## 配置
 
-## 验证首次使用
+配置入口为 [app/core/config/settings.py](app/core/config/settings.py)。优先级是：显式构造参数 > 环境变量 > 当前工作目录的 UTF-8 `.env` > 默认值。配置加载后不可变，进程内缓存；修改配置需重启。未知 `.env` 字段会报错。
 
-1. 在 `/docs` 执行 `POST /api/v1/auth/login`，使用刚创建的用户名和密码。
-2. 将返回的 `data.access_token` 填入 Authorize，调用 `/api/v1/auth/me` 和用户管理接口。
-3. 在 `POST /api/v1/files` 上传 txt 文件，默认 private；根据返回的字符串 ID 查询、下载和删除。
-4. 使用 `POST /api/v1/auth/refresh` 的 JSON 请求体刷新令牌；退出后客户端删除两个令牌。
+| 环境变量 | 默认值或说明 |
+| --- | --- |
+| `ENVIRONMENT` | `development`，可选 `testing`、`production` |
+| `DEBUG` | `false`，生产禁止开启 |
+| `APP_TITLE` | `FastAPI Plus`，接口文档标题 |
+| `APP_SUMMARY` / `APP_DESCRIPTION` | 空，接口文档简介与详细说明 |
+| `OPENAPI_ENABLED` | `true`，控制 Swagger、ReDoc 和 OpenAPI 入口 |
+| `CORS_ALLOW_ORIGINS` | `[]`，跨域来源 JSON 数组，空数组关闭 CORS |
+| `DATABASE` | `sqlite`，可选 `postgresql`、`mysql` |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/app.db` |
+| `JWT_SECRET` | 开发未设置时生成实例级临时密钥；生产必须设置至少 32 字节随机秘密 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `30`，范围 1–1440 分钟 |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7`，范围 1–365 天 |
+| `STORAGE_BACKEND` | `local`，可选 `oss`、`cos` |
+| `STORAGE_LOCAL_ROOT` | `data/storage` |
+| `FILE_MAX_SIZE` | `10485760` 字节，即 10 MiB |
+| `LOG_LEVEL` | `INFO`，支持 DEBUG / INFO / WARNING / ERROR / CRITICAL |
+| `LOG_FORMAT` | 未设置时开发/测试为 `console`，生产为 `json`；仅控制控制台格式 |
+| `LOG_FILE_PATH` | 未设置时仅输出控制台；指定文件路径后同时落盘 |
+| `LOG_FILE_MAX_BYTES` | `10485760`，单个日志文件轮转阈值，必须为正整数 |
+| `LOG_FILE_BACKUP_COUNT` | `5`，轮转备份数量，至少为 1 |
+| `REDIS_ENABLED` / `CELERY_ENABLED` | `false`，连接配置见下文 |
 
-本地文件首次上传会创建存储目录。若需上传前运行 `fastplus doctor`，先显式创建
-`data/storage`（PowerShell：`New-Item -ItemType Directory -Force data/storage`；POSIX：`mkdir -p data/storage`）。
-`/health` 只检查进程存活；`uv run fastplus doctor` 检查连接、迁移状态和存储条件。
-部署配置、备份、升级步骤和已知限制见 [发布验收](docs/release.md)。
+所有相对路径均相对进程工作目录，Web、CLI 和 Worker 应在项目根目录启动。开发也建议配置固定随机 `JWT_SECRET`，否则重启会使旧令牌失效；多个进程必须使用相同密钥。
 
-## 核心理念与架构
+前端跨域接入示例：
 
-**Lightweight / Explicit / Modular / Replaceable / Predictable**
-
-- 核心依赖少，默认使用 SQLite 和 Local 文件系统。
-- 按业务模块组织代码，显式注册路由和装配依赖。
-- 使用成熟框架原生能力，只抽象稳定的应用能力。
-- 可选基础设施未安装且未启用时，不影响基础应用。
-
-当前 Auth/User/File、CLI 与 Worker 遵循以下调用方向：
-
-```text
-HTTP Router / CLI / Celery Task
-              ↓
-           Service
-              ↓
-     Repository / Provider
-              ↓
-        Infrastructure
+```dotenv
+CORS_ALLOW_ORIGINS=["http://localhost:5173","https://frontend.example.com"]
 ```
 
-Service 管理业务与事务；Repository 管理数据库访问；
-Infrastructure 实现 Provider 契约。详见 [架构](docs/architecture.md)。
-M0–M9 的目录已按 [设计代码树](docs/Project%20Structure.md) 归位：Bootstrap 显式装配，
-配置、异常和日志按职责拆分，TokenStore 契约与默认空实现合放，测试按层及业务模块组织。
+来源由协议、主机、端口组成，不带末尾斜线，不接受通配符。认证使用 Bearer 请求头，默认不启用跨域 Cookie。允许的方法和请求头在 [bootstrap/middleware.py](app/bootstrap/middleware.py) 显式维护；默认包含 GET/HEAD/POST/PATCH/DELETE/OPTIONS，以及 Authorization、Content-Type、X-Request-ID。浏览器可读取 X-Request-ID 和 Content-Disposition。CORS 不替代鉴权，云下载重定向后的跨域规则需在目标桶配置。
 
-## v0.1 功能范围
+## 日志与排障
 
-- FastAPI 应用工厂、Pydantic 配置、structlog、请求 ID、统一响应与异常。
-- SQLAlchemy 2.x async、Alembic；默认 SQLite，支持 MySQL 和 PostgreSQL。
-- `auth`、`user`、`file` 三个参考模块；Argon2id 与 JWT access/refresh token。
-- 默认 Local 存储，支持 Aliyun OSS、Tencent COS。
-- Redis、Celery 可选且默认关闭；项目 CLI、测试和文档。
+日志统一由 structlog 和标准 logging 输出到 stderr。需要本地留存时，在 `.env` 增加：
 
-无 Docker 要求，无前端依赖。不内置完整 RBAC、菜单、部门、租户、工作流、
-低代码 CRUD、插件市场、SSO/OAuth/OIDC 或监控平台。
-不构建通用 CRUD 框架、自动路由扫描或复杂 IoC；不提供默认管理员凭据。
+```dotenv
+LOG_FILE_PATH=logs/app.log
+LOG_FILE_MAX_BYTES=10485760
+LOG_FILE_BACKUP_COUNT=5
+```
 
-## 开发与质量检查
+日志目录自动创建。文件使用 UTF-8 逐行 JSON，中文直接可读；达到大小阈值时轮转为 `app.log.1` 至 `app.log.5`，旧备份自动淘汰。控制台与文件使用相同级别、请求上下文和脱敏处理，重复初始化不会增加重复输出。
 
-需要 Python >= 3.11，以及 [uv](https://docs.astral.sh/uv/getting-started/installation/)。
-在仓库根目录执行：
+本地轮转适用于**单进程独占文件**。Web、CLI 和 solo Worker 同时运行时应配置各自不同路径；Uvicorn 多 Worker、Celery prefork 等多进程部署应取消 `LOG_FILE_PATH` 配置，由进程管理器或日志收集服务接管 stderr 及轮转。不要让多个进程共写同一轮转文件。
+
+每个 HTTP 响应包含 `X-Request-ID`。排障时从响应中取得该值，再检索日志：
+
+```powershell
+# PowerShell：包含当前文件及轮转备份
+Select-String -Path logs/app.log* -Pattern '实际的请求ID' -SimpleMatch
+Get-Content -Encoding UTF8 logs/app.log -Tail 50 -Wait
+```
 
 ```bash
-uv sync
-uv run ruff check .
-uv run ruff format --check .
-uv run pyright
-uv run pytest
+# Linux/macOS
+grep -F '实际的请求ID' logs/app.log*
+tail -f logs/app.log
 ```
 
-发布时还需执行覆盖率检查和三数据库在线测试；完整可复制命令见
-[测试指南](docs/testing.md#发布质量)和[发布验收](docs/release.md)。普通 `pytest` 使用临时 SQLite，
-不要求外部服务，也不会把未运行的 PostgreSQL/MySQL 测试计为通过。
+`request.completed` 包含请求方法、路径、状态码与 `duration_ms`；`request.failed` 提供安全异常类型和函数/行号。任务使用 `task_id`、`correlation_id` 关联，时间统一为 UTC ISO 8601。
 
-`uv sync` 可编辑安装当前项目及默认 dev 依赖组；`uv.lock` 保存已验证的解析结果。
-运行时依赖包括 FastAPI、Pydantic、pydantic-settings、structlog、Uvicorn、
-SQLAlchemy asyncio、aiosqlite、Alembic、argon2-cffi、PyJWT、email-validator 和 python-multipart；
-项目 CLI 使用 Typer；命令、退出码和只读诊断范围见 [cli](docs/cli.md)。
-asyncpg/asyncmy、OSS/COS SDK 按 extra 安装，HTTPX 仅用于测试。
-开发组另装 PyJWT 的 crypto extra 以支持严格类型检查，HS256 运行时不依赖 cryptography。
-项目使用标准 Python 构建接口，并不依赖 uv 专有打包格式。
+业务直接获取 logger，保持稳定事件名，将上下文作为字段传入：
 
-修改代码后可用 `uv run ruff format .` 格式化。
-激活虚拟环境后，也可直接执行 `ruff`、`pyright` 和 `pytest`。
-安装步骤、提交约定和 PR 清单见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+```python
+import structlog
 
-## 仓库结构
-
-```text
-app/          bootstrap/、core/、common/、database/、providers/、infrastructure/、modules/{user,auth,file}/、cli/
-tests/        conftest.py、unit/、integration/、api/
-docs/         主题设计文档
-data/         SQLite 和本地文件运行数据，内容不提交
-alembic/      异步迁移环境、模板与 versions/
+logger = structlog.get_logger(__name__)
+# 放在业务提交成功后，使用实际的业务标识。
+logger.info("order.created", order_id=order.id)
 ```
 
-## 文档导航
+不要记录密码、Token、完整请求体、SQL 参数或签名 URL。未知异常不会输出原始异常文本和局部变量；日志脱敏是兜底，业务仍须选择安全字段。开启文件输出后需确保目录可写，日志文件不要对外公开。
 
-| 文档 | 内容 |
+`fastplus doctor` 只读检查数据库连接、迁移状态、存储目录和已启用组件，不创建数据库或修复目录；开启文件日志时，命令的日志初始化仍会创建日志目录/文件。`/health` 仅表示进程存活。
+
+## 接口使用
+
+在 `/docs` 调用 `POST /api/v1/auth/login`，输入管理员用户名和密码。将响应的 `data.access_token` 填入 Authorize；普通 HTTP 客户端设置 `Authorization: Bearer <access_token>`。
+
+| 模块 | 接口 |
 | --- | --- |
-| [architecture](docs/architecture.md) | 分层、模块与目标目录 |
-| [Project Structure](docs/Project%20Structure.md) | M0–M9 实际代码树、设计对齐与保留差异 |
-| [coding-convention](docs/coding-convention.md) | 类型、代码风格、依赖政策 |
-| [database](docs/database.md) | 数据模型、事务、迁移与兼容性 |
-| [api](docs/api.md) | URL、序列化、分页与 OpenAPI |
-| [errors](docs/errors.md) | 响应、错误描述符与 HTTP 映射 |
-| [security](docs/security.md) | 认证、授权与安全默认值 |
-| [configuration](docs/configuration.md) | 配置来源、装配与生命周期 |
-| [extensions](docs/extensions.md) | Provider、Adapter 与可选依赖 |
-| [storage](docs/storage.md) | 文件资源、存储与补偿 |
-| [celery](docs/celery.md) | 独立 Worker、任务边界与异步桥接 |
-| [logging](docs/logging.md) | 结构化事件、上下文与脱敏 |
-| [testing](docs/testing.md) | 当前检查与后续测试要求 |
-| [cli](docs/cli.md) | 项目命令、只读诊断和管理员创建 |
-| [reference-modules](docs/reference-modules.md) | auth/user/file 的职责与验收 |
-| [roadmap](docs/roadmap.md) | M0–M10、产品边界与发布门槛 |
-| [release](docs/release.md) | M9 验证记录、兼容性矩阵、部署与已知限制 |
-| [audit](docs/audit.md) | M0–M9 全量审计、复现修复、可靠性边界与复核结果 |
-| [scaffold-review](docs/scaffold-review.md) | 新旧脚手架对照、采纳细节与上线收口验证 |
-| [CHANGELOG](CHANGELOG.md) | 版本变更记录 |
+| 认证 | `POST /api/v1/auth/login`、`POST /api/v1/auth/refresh`、`POST /api/v1/auth/logout`、`GET /api/v1/auth/me` |
+| 用户 | `GET/POST /api/v1/users`、`GET/PATCH/DELETE /api/v1/users/{id}` |
+| 文件 | `POST /api/v1/files`、`GET/DELETE /api/v1/files/{id}`、`GET /api/v1/files/{id}/download` |
 
-## 路线图
+JSON 业务接口使用 `code/message/data`，同时保留真实 HTTP 状态；错误额外包含 `request_id`。输入校验为 422，未认证为 401，无权限为 403。数据库 ID 在响应中序列化为字符串，分页参数为 `page`、`size`，最大每页 100 条。
 
-M0 仓库基础 → M1 启动与配置 → M2 日志/响应/错误 → M3 数据库 →
-M4 User → M5 Auth → M6 Storage/File → M7 Redis/Celery → M8 CLI →
-M9 Release Hardening → M10 正式发布验收。M9 按本次范围合并兼容性、质量与文档加固，
-正式发布仍需维护者确认发布清单，完整验收见 [roadmap](docs/roadmap.md)。
+用户管理要求超级管理员，禁止自删。刷新接口接收 `{"refresh_token":"..."}`；默认令牌撤销使用 `NullTokenStore`，退出后客户端删除两类令牌，服务端旧令牌仍有效至到期。需要强制退出或刷新防重放时，按业务实现有状态策略。
+
+文件上传使用 multipart 的 `file` 字段和可选 `visibility`（`private` / `public`），默认私有。私有元数据和下载仅所有者或超级管理员可访问；公开文件可匿名读取，删除仍需所有者或管理员权限。支持 txt/pdf/png/jpg/jpeg/bin，扩展名与 MIME 对应关系在 [FileService](app/modules/file/service.py) 中维护。
+
+本地文件保存到 `data/storage/{private,public}`，不静态挂载。下载返回文件流，云下载返回 307 短期签名地址，均不套 JSON 响应。大小和 MIME 校验不等于内容扫描，部署层应另设请求体大小限制。
+
+## 数据库与常用命令
+
+SQLite 开箱可用。外部数据库需预先创建数据库，并安装相应驱动：
+
+```bash
+uv sync --locked --extra postgresql
+# 或
+uv sync --locked --extra mysql
+```
+
+PostgreSQL 使用 `DATABASE=postgresql` 和 `postgresql+asyncpg://...` 连接串；MySQL 使用 `DATABASE=mysql` 和 `mysql+asyncmy://...`，按需加 `?charset=utf8mb4`。真实凭据写入本地 `.env` 或通过部署环境注入。
+
+| 命令 | 用途 |
+| --- | --- |
+| `uv run --no-sync fastplus --help` | 查看命令帮助 |
+| `uv run --no-sync fastplus version` | 查看项目及运行时版本 |
+| `uv run --no-sync fastplus doctor` | 只读资源诊断 |
+| `uv run --no-sync fastplus db current` | 当前迁移版本 |
+| `uv run --no-sync fastplus db revision -m "add orders" --autogenerate` | 根据显式导入的模型生成迁移草稿 |
+| `uv run --no-sync fastplus db upgrade` | 升级至 head |
+| `uv run --no-sync fastplus db downgrade -- -1` | 显式回退一个版本，可能删除数据 |
+| `uv run --no-sync fastplus create-superuser` | 交互创建管理员 |
+
+自动生成的迁移必须检查后再执行。应用启动不自动建表、迁移或初始化账号。已应用的迁移应保留，模型变化通过新增迁移表达。
+
+## 可选存储与任务
+
+### OSS / COS
+
+安装 `uv sync --locked --extra oss` 或 `uv sync --locked --extra cos`，设置 `STORAGE_BACKEND=oss` 或 `cos`，并填写对应配置：
+
+```dotenv
+# OSS
+STORAGE_OSS__BUCKET=your-bucket
+STORAGE_OSS__REGION=cn-hangzhou
+# STORAGE_OSS__ACCESS_KEY_ID=由环境注入
+# STORAGE_OSS__ACCESS_KEY_SECRET=由环境注入
+
+# COS：ACCESS_KEY_ID / ACCESS_KEY_SECRET 分别对应 SecretId / SecretKey
+STORAGE_COS__BUCKET=your-bucket-appid
+STORAGE_COS__REGION=ap-guangzhou
+# STORAGE_COS__ACCESS_KEY_ID=由环境注入
+# STORAGE_COS__ACCESS_KEY_SECRET=由环境注入
+```
+
+只填写实际启用后端的整组配置。配置即注册后端；切换默认后端后，已有文件仍按数据库中的 `backend/key` 访问，须保留历史后端配置和 SDK。桶策略须保持 private 前缀私有，public 对象使用公开 ACL；下载链接有效期为 300 秒。
+
+文件上传先写对象再提交元数据，数据库失败时尽力删除新对象；删除操作也跨数据库与存储。两者不具备跨系统原子事务，补偿失败需根据日志核对元数据和对象。
+
+### Redis / Celery
+
+应用缓存客户端使用 `uv sync --locked --extra redis`，配合 `REDIS_ENABLED=true`、`REDIS_URL=redis://localhost:6379/0`。
+
+后台任务使用 `uv sync --locked --extra celery`，配置：
+
+```dotenv
+CELERY_ENABLED=true
+CELERY_BROKER_URL=redis://localhost:6379/1
+# 按需保存结果；不配置时默认忽略结果
+# CELERY_RESULT_BACKEND=redis://localhost:6379/2
+```
+
+Redis 应用客户端与 Celery Broker 的开关独立。另开终端启动 Worker，数据库配置应与 Web 一致：
+
+```bash
+uv run --no-sync celery -A app.bootstrap.worker:celery_app worker --loglevel=INFO
+# Windows 本地调试
+uv run --no-sync celery -A app.bootstrap.worker:celery_app worker --pool=solo --concurrency=1 --loglevel=INFO
+```
+
+solo 模式不提供 prefork 的软/硬任务超时保障。Web 不会自动启动 Worker 或 Beat。
+示例 `user.status` 接收已存在的正整数用户 ID，返回用户启用状态；任务包装与注册见 [user/tasks.py](app/modules/user/tasks.py)。HTTP 入口可通过 `request.app.state.celery.send_task("user.status", args=[user_id])` 发送，须先启用任务，并在业务提交后发送；不要在请求中阻塞等待结果。
+
+任务参数和结果只用 JSON 数据，Session、ORM 或完整 Token 不进入消息。任务复用 Service，通过集中异步桥接创建独立资源；示例仅对明确的暂时性数据库故障最多重试 3 次。
+
+多个 extra 可重复指定：`uv sync --locked --extra postgresql --extra oss --extra celery`。同步后使用 `uv run --no-sync ...` 保留已选择的安装环境。
+
+## 二次开发
+
+调用方向为 `Router / CLI / Task → Service → Repository / Provider → Infrastructure`。按实际业务新增模块，已有 auth/user/file 可作为参考，不要求每个模块都创建全部文件。
+
+1. 在 `app/modules/<业务名>/` 新建 Python 包（含 `__init__.py`）。按需添加 `model.py`、`schema.py`、`repository.py`、`service.py`、`router.py`、`dependencies.py` 和 `errors.py`。
+2. Model 继承 `database.base.Base`，时间字段可用 `TimestampMixin`；在 `app/database/metadata.py` 显式导入，让 Alembic 发现模型。
+3. Repository 使用 SQLAlchemy 查询，负责 add/flush/refresh，不提交事务。Service 管理业务规则与 commit/rollback，返回模型或应用结果。
+4. Schema 分开声明创建、更新、查询和响应字段。Router 使用 Depends 装配 Service，解析 HTTP 并返回 `ApiResponse[T]`，不写 SQL 或直接调用云 SDK。
+5. 在 `app/bootstrap/routers.py` 导入并 `include_router`，默认业务前缀为 `/api/v1`。新增 HTTP 方法或请求头时同步检查 CORS 配置。
+6. 在模块 `errors.py` 定义唯一的 `ErrorDescriptor(code, key, message, status_code)`，Service 抛 `BusinessException`；安全消息由中央处理器转换，不逐路由重复捕获。
+7. 生成并审阅新增迁移，在专用数据库执行升级；为业务行为在 `tests/` 添加测试，业务说明放 `docs/`。
+
+| 扩展需求 | 修改位置 |
+| --- | --- |
+| 新配置字段 | `app/core/config/` 对应分组，必要时在 `Settings` 组合；同步 `.env.example` |
+| 新权限规则 | `app/core/security/permissions.py`，路由使用 `require_permission("资源:动作")` |
+| 新存储实现 | 实现 `StorageProvider`，放入 `infrastructure/storage/`，在 `bootstrap/providers.py` 注册 |
+| 服务端令牌撤销 | 实现 `TokenStore`，在 `bootstrap/providers.py` 替换默认实例 |
+| 新异步任务 | 模块内编写包装与异步处理器，在 `bootstrap/worker.py` 显式注册 |
+| 新 CLI 命令 | `app/cli/` 中添加，在 `app/cli/main.py` 注册，独立装配并复用 Service |
+| 应用名称与版本 | 文档名称用 `APP_TITLE`；版本来自 `pyproject.toml` 安装元数据 |
+
+更改 Python 包分发名 `fastapi-plus` 时，也要同步 Web 工厂和 CLI 中的元数据查询名称，并执行 `uv sync`。仅更改业务文档标题无需改包名。
+
+业务开发检查：
+
+```bash
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pyright
+# 添加业务测试后执行
+uv run --no-sync pytest
+```
+
+`tests/` 初始为空，Pytest 的“未收集到测试”（退出码 5）不代表测试通过。测试使用临时目录、独立配置和专用数据库，不读取开发者 `.env` 或操作生产资源。项目保留测试工具和基础配置，具体业务自行建立所需用例。
+
+## 部署
+
+从完整模板部署，保留 `alembic/` 与 `alembic.ini`。安装运行依赖：
+
+```bash
+uv sync --locked --no-dev
+# 按需追加 --extra postgresql / --extra mysql / --extra oss / --extra cos / --extra celery
+```
+
+通过部署环境配置 `ENVIRONMENT=production`、`DEBUG=false`、固定随机 `JWT_SECRET` 及实际资源连接。创建数据目录，备份后显式迁移，再运行 `fastplus doctor` 和业务流程验证：
+
+```bash
+uv run --no-sync fastplus db upgrade
+uv run --no-sync fastplus doctor
+uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+首次部署另行交互创建管理员。生产不用 `--reload`；HTTPS、进程管理、访问限制、请求体上限、日志留存和备份由部署环境配置。上线前在目标数据库与实际启用的存储、Broker 上验证业务流程。数据库与文件对象需协调备份，迁移降级不能替代备份恢复。
 
 ## 许可证
 
-使用 [MIT License](LICENSE)。版权年份为 2026，版权主体仍待维护者在发布前填写。
+[MIT License](LICENSE)。使用和分发时保留许可声明；正式分发前由维护者填写 LICENSE 中的版权主体。

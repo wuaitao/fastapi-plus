@@ -14,6 +14,7 @@ from app.providers.token_store import NullTokenStore
 
 
 def create_storage_registry(settings: Settings) -> StorageRegistry:
+    """注册本地及已配置的云存储，保留按历史后端读取的能力。"""
     registry = StorageRegistry(settings.storage_backend)
     registry.register("local", LocalStorage(settings.storage_local_root))
     if settings.storage_oss is not None:

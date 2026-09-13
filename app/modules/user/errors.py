@@ -14,6 +14,7 @@ USER_SELF_DELETE = ErrorDescriptor(30004, "USER_SELF_DELETE", "Cannot delete you
 
 
 def is_user_unique_violation(error: IntegrityError) -> bool:
+    """只识别用户名和邮箱的已知唯一冲突，避免掩盖其他完整性错误。"""
     original = error.orig
     if original is None:
         return False

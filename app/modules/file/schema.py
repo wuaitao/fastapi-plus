@@ -24,8 +24,10 @@ class FileResponse(BaseModel):
 
     @field_serializer("id")
     def serialize_id(self, value: int) -> str:
+        """将数据库整数 ID 序列化为字符串，避免客户端数值精度丢失。"""
         return str(value)
 
     @field_serializer("created_by")
     def serialize_creator(self, value: int | None) -> str | None:
+        """序列化所有者 ID，已删除用户保留空值。"""
         return str(value) if value is not None else None

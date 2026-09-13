@@ -47,6 +47,7 @@ class FileService:
         self.max_size = max_size
 
     def _validate(self, content: BinaryIO, filename: str, content_type: str) -> int:
+        """校验文件名和类型，分块统计实际大小并将流复位。"""
         if (
             not filename
             or len(filename) > 255
@@ -76,6 +77,7 @@ class FileService:
         visibility: Visibility,
         actor: User,
     ) -> FileRecord:
+        """先保存对象再提交元数据，失败时回滚并尽力补偿已写入对象。"""
         if visibility not in ("private", "public"):
             raise ValueError("无效的文件可见性")
         validation = asyncio.create_task(
@@ -129,6 +131,7 @@ class FileService:
 
     @staticmethod
     def _authorize(record: FileRecord, actor: User | None, *, write: bool = False) -> None:
+        """公开文件允许匿名读取，私有读取和所有写入要求所有者或管理员。"""
         if not write and record.visibility == "public":
             return
         if actor is None:
@@ -137,6 +140,7 @@ class FileService:
             raise AuthorizationException()
 
     async def get_file(self, file_id: int, actor: User | None) -> FileRecord:
+        """查询文件元数据并检查读取权限。"""
         record = await self.repository.get(file_id)
         if record is None:
             raise BusinessException(FILE_NOT_FOUND)
@@ -144,6 +148,7 @@ class FileService:
         return record
 
     async def download(self, file_id: int, actor: User | None) -> FileDownload:
+        """按记录中的历史后端定位对象，授权后取得下载能力。"""
         record = await self.get_file(file_id, actor)
         provider = self.storage.get(record.backend)
         if not await provider.exists(record.key, visibility=record.visibility):
@@ -156,6 +161,7 @@ class FileService:
         return FileDownload(record, access)
 
     async def delete_file(self, file_id: int, actor: User) -> None:
+        """授权后删除对象和元数据，数据库回滚不能恢复已删除的对象。"""
         record = await self.get_file(file_id, actor)
         self._authorize(record, actor, write=True)
         provider = self.storage.get(record.backend)

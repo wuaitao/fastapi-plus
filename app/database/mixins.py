@@ -14,6 +14,7 @@ class UTCDateTime(TypeDecorator[datetime]):
     cache_ok = True
 
     def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        """将带时区时间转换为无时区 UTC 后入库，拒绝含糊的本地时间。"""
         if value is None:
             return None
         if value.tzinfo is None or value.utcoffset() is None:
@@ -21,10 +22,12 @@ class UTCDateTime(TypeDecorator[datetime]):
         return value.astimezone(UTC).replace(tzinfo=None)
 
     def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        """为读取的数据库时间恢复 UTC 时区标识。"""
         return value.replace(tzinfo=UTC) if value is not None else None
 
 
 def utc_now() -> datetime:
+    """返回带 UTC 时区的当前时间，供模型默认值和更新使用。"""
     return datetime.now(UTC)
 
 

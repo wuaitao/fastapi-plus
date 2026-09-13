@@ -22,6 +22,7 @@ from app.modules.user.service import UserService
 
 @contextmanager
 def command_errors() -> Generator[None]:
+    """将应用、输入与运行错误转换为安全提示和 CLI 退出码。"""
     try:
         yield
     except (typer.Exit, typer.Abort):
@@ -39,12 +40,14 @@ def command_errors() -> Generator[None]:
 
 
 def load_settings() -> Settings:
+    """读取进程配置并初始化 CLI 日志。"""
     settings = get_settings()
     configure_logging(settings)
     return settings
 
 
 def migration_config() -> Config:
+    """从当前项目根目录加载 Alembic 配置。"""
     # Template-first 命令使用当前项目，不能静默迁移安装包所在仓库。
     path = Path("alembic.ini")
     if not path.is_file():
@@ -55,6 +58,7 @@ def migration_config() -> Config:
 
 @asynccontextmanager
 async def user_service(settings: Settings) -> AsyncGenerator[UserService]:
+    """为单次 CLI 操作装配用户服务，退出时关闭 Session 和引擎。"""
     engine = create_engine(settings, null_pool=True)
     try:
         async with session_scope(create_session_factory(engine)) as session:

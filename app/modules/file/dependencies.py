@@ -19,6 +19,7 @@ from app.providers.storage import StorageRegistry
 def get_file_service(
     request: Request, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> FileService:
+    """组合请求 Session、存储注册表和大小限制，构造文件服务。"""
     settings = cast(Settings, request.app.state.settings)
     return FileService(
         FileRepository(session),
@@ -31,6 +32,7 @@ async def get_optional_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
     request: Request,
 ) -> User | None:
+    """允许未携带凭据的匿名读取，已提交的 Bearer 令牌必须通过验证。"""
     # 提交了 Bearer 就必须验证，不能把无效令牌降级为匿名身份。
     if credentials is None:
         return None

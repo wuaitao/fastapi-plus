@@ -11,6 +11,7 @@ from app.core.logging.config import configure_logging
 
 
 def propagate_context(headers: dict[str, Any] | None = None, **kwargs: Any) -> None:
+    """通过消息头传递关联 ID 与操作者，并隐藏原生参数展示。"""
     if headers is None:
         return
     context = structlog.contextvars.get_contextvars()
@@ -32,6 +33,7 @@ class WorkerLogging:
         self.settings = settings
 
     def setup(self, **kwargs: Any) -> None:
+        """接管 Worker 日志配置，屏蔽可能拼接敏感任务内容的原生日志。"""
         configure_logging(self.settings)
         # 原生任务日志会拼接结果、异常与任意参数，统一由 BaseTask 输出安全事件。
         # Broker 诊断仍可由 Celery 命令退出状态及应用启动错误定位。
@@ -41,4 +43,5 @@ class WorkerLogging:
             logger.propagate = False
 
     def connect(self) -> None:
+        """注册 Worker 日志初始化信号，由应用持有接收者生命周期。"""
         setup_logging.connect(self.setup)
