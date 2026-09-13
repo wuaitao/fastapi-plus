@@ -6,10 +6,7 @@ from uuid import uuid4
 
 import structlog
 from starlette.datastructures import Headers, MutableHeaders
-from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-
-from app.core.exceptions.handlers import unexpected_exception_handler
 
 logger = structlog.get_logger(__name__)
 _REQUEST_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
@@ -34,26 +31,16 @@ class RequestContextMiddleware:
         )
         started = perf_counter()
         status_code = 500
-        response_started = False
 
         async def send_with_request_id(message: Message) -> None:
-            nonlocal status_code, response_started
+            nonlocal status_code
             if message["type"] == "http.response.start":
                 MutableHeaders(scope=message)["X-Request-ID"] = request_id
                 status_code = message["status"]
-                response_started = True
             await send(message)
 
         try:
-            try:
-                await self.app(scope, receive, send_with_request_id)
-            except Exception as exc:
-                # 在 Starlette 的 DEBUG traceback 响应之前兜底，并只记录一次未知异常。
-                response = await unexpected_exception_handler(Request(scope), exc)
-                if response_started:
-                    # 已发送的流无法替换成 JSON；让服务器中止连接，不发送第二组响应头。
-                    raise
-                await response(scope, receive, send_with_request_id)
+            await self.app(scope, receive, send_with_request_id)
         finally:
             try:
                 logger.info(

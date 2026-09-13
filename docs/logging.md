@@ -58,8 +58,11 @@ Access Key / AccessKeyId / AWS_ACCESS_KEY_ID 等云凭据字段及带标签文�
 异常诊断也必须遵守脱敏，不把敏感值藏进异常文本或 traceback 局部变量。
 
 已知业务异常在有语义的边界记录，通常不输出 traceback；
-未知异常在最外层记录一次安全内部诊断，对外遵循 [errors](errors.md)。
+未知异常由集中安全兜底记录一次安全内部诊断，对外遵循 [errors](errors.md)。
 不在 Repository、Service、Router、Handler 各重复记录同一错误。
+
+上下文层位于 CORS 外层，启用跨域后的 OPTIONS 预检也记录完成事件和请求 ID；
+未知异常兜底位于 CORS 内层，使安全错误响应经过跨域头处理。装配顺序见 [configuration](configuration.md)。
 
 未知异常的 `request.failed` 仅记录 `error_type` 和函数名/行号组成的 `frames`，
 不记录异常文本、源码或局部变量。通用输出处理器移除 exc_info/stack 等原始诊断，

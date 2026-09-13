@@ -45,6 +45,9 @@ uv run uvicorn app.main:app --reload
 访问 `http://127.0.0.1:8000/health`，返回 `{"status":"ok"}`。
 交互文档位于 `/docs`、`/redoc`，OpenAPI 位于 `/openapi.json`。
 `OPENAPI_ENABLED=false` 可独立关闭这些文档入口。
+业务项目可通过 `APP_TITLE`、`APP_SUMMARY`、`APP_DESCRIPTION` 设置文档名称和说明。
+跨域浏览器接入使用 `CORS_ALLOW_ORIGINS` 明确来源白名单，默认关闭；示例与边界见
+[跨域配置](docs/configuration.md#业务名称与浏览器跨域)。
 `LOG_FORMAT=json` 可切换 JSON 日志；未指定时开发/测试使用 console，生产使用 JSON。
 所有 HTTP 响应携带 `X-Request-ID`；Health 响应体保持原格式。
 配置来源、变量名及当前校验边界见 [configuration](docs/configuration.md)。
@@ -171,6 +174,7 @@ alembic/      异步迁移环境、模板与 versions/
 | [roadmap](docs/roadmap.md) | M0–M10、产品边界与发布门槛 |
 | [release](docs/release.md) | M9 验证记录、兼容性矩阵、部署与已知限制 |
 | [audit](docs/audit.md) | M0–M9 全量审计、复现修复、可靠性边界与复核结果 |
+| [scaffold-review](docs/scaffold-review.md) | 新旧脚手架对照、采纳细节与上线收口验证 |
 | [CHANGELOG](CHANGELOG.md) | 版本变更记录 |
 
 ## 路线图

@@ -87,3 +87,8 @@ OpenAPI 必须反映实际泛型响应、字符串 ID、HTTP Bearer 认证和自
 
 前端仅依赖公开 API 契约，不绑定任何 Admin UI。
 公开契约变更需同步文档和 API/OpenAPI 测试。
+
+OpenAPI 名称/简介/说明支持 `APP_TITLE`、`APP_SUMMARY`、`APP_DESCRIPTION`，版本与已安装项目一致。
+浏览器跨域需显式配置 `CORS_ALLOW_ORIGINS`；成功与错误响应均可读取 X-Request-ID，
+本地下载可读取 Content-Disposition。CORS 预检使用原生纯文本 200/400，不作为业务端点写入 OpenAPI。
+配置与方法/请求头范围见 [configuration](configuration.md#业务名称与浏览器跨域)。

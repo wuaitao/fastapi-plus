@@ -150,3 +150,9 @@ Repository/Auth/User/File 流程，也可用 `--release-database=postgresql|mysq
 Redis/Celery 集成测试按设计分别归入 `integration/redis/` 与 `integration/celery/`；
 断言和共享 fixture 作用域保留，最终结果见 [全量审计](audit.md)。
 质量门和 Definition of Done 见 [AGENTS](../AGENTS.md)。
+
+上线收口新增 `tests/api/test_cors.py`，覆盖默认关闭、Bearer/JSON 预检、来源/方法/头拒绝，
+成功及 401/403/404/405/422/500/503 的跨域头、请求 ID、DEBUG 安全错误与流式中止。
+Settings 测试验证 JSON 来源优先级与非法 Origin，Health/OpenAPI 测试验证业务名称和安装版本。
+`.gitattributes` 固定 Python 文件为 LF，与 Ruff 配置一致，避免 Windows 检出造成格式漂移。
+本次对照取舍和验证结果见 [上线收口](scaffold-review.md)。

@@ -1,5 +1,7 @@
 """应用工厂负责配置、生命周期和路由装配"""
 
+from importlib.metadata import version
+
 from fastapi import FastAPI
 
 from app.bootstrap.exceptions import register_exception_handlers
@@ -16,8 +18,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings if settings is not None else get_settings()
     configure_logging(settings)
     app = FastAPI(
-        title="FastAPI Plus",
-        version="0.1.0.dev0",
+        title=settings.app_title,
+        summary=settings.app_summary,
+        description=settings.app_description,
+        version=version("fastapi-plus"),
         debug=settings.debug,
         openapi_url="/openapi.json" if settings.openapi_enabled else None,
         lifespan=lifespan,
@@ -39,6 +43,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     register_providers(app, settings)
     register_exception_handlers(app)
-    register_middleware(app)
+    register_middleware(app, settings)
     register_routers(app)
     return app

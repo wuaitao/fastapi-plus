@@ -23,6 +23,10 @@ M8/M9 补齐独立 CLI 装配及发布验收；本页描述当前实现。
 | `ENVIRONMENT` | `environment` | `development` | development / testing / production 枚举 |
 | `DEBUG` | `debug` | `false` | 布尔值；生产环境禁止开启 |
 | `OPENAPI_ENABLED` | `openapi_enabled` | `true` | 独立控制 OpenAPI、Swagger UI 和 ReDoc 入口 |
+| `APP_TITLE` | `app_title` | `FastAPI Plus` | 非空字符串，OpenAPI 应用名称 |
+| `APP_SUMMARY` | `app_summary` | 空字符串 | OpenAPI 简介 |
+| `APP_DESCRIPTION` | `app_description` | 空字符串 | OpenAPI 说明，支持 Markdown |
+| `CORS_ALLOW_ORIGINS` | `cors_allow_origins` | `[]` | JSON 数组；仅明确 HTTP/HTTPS 来源，无路径、查询、片段、凭据或通配符；空数组禁用 |
 | `LOG_FORMAT` | `log_format` | 未设置 | console / json；未设置时开发/测试为 console，生产为 json |
 | `LOG_LEVEL` | `log_level` | `INFO` | DEBUG / INFO / WARNING / ERROR / CRITICAL |
 | `DATABASE` | `database` | `sqlite` | sqlite / postgresql / mysql |
@@ -111,9 +115,35 @@ Web 统一使用 bootstrap/lifespan 管理资源。
 关闭时反向释放，启动中途失败也要清理已创建资源。
 不强制每个 Provider 实现空的生命周期方法。
 
-Middleware 保持无业务，认证授权放依赖。当前中间件处理请求 ID、访问日志与安全错误输出；
-未内置 CORS 或通用安全响应头配置。业务以后新增这些原生中间件时，须通过行为测试验证
-正常及异常路径的顺序，避免各模块分散注册。
+Middleware 保持无业务，认证授权放依赖。请求方向为 RequestContextMiddleware →
+可选原生 CORSMiddleware → SafeExceptionMiddleware → 框架异常处理与路由。
+请求上下文在最外层保证预检也有请求 ID 和完成日志；安全异常兜底在 CORS 内层，
+保证未知错误转换出的 500 也带跨域响应头。流式响应不缓冲，已开始的流失败时中止连接。
+注册集中在 Bootstrap；原有未知异常兜底逻辑位于 `core/exceptions/middleware.py`。
+
+## 业务名称与浏览器跨域
+
+`APP_TITLE`、`APP_SUMMARY`、`APP_DESCRIPTION` 直接传给 FastAPI，不影响路由或包名。
+OpenAPI 版本通过 `importlib.metadata.version("fastapi-plus")` 读取，与 `fastplus version`
+一致；修改 `pyproject.toml` 版本后需重新同步安装，不另设可能漂移的版本环境变量。
+
+默认同源使用不需配置 CORS。跨域浏览器接入时设置，例如：
+
+```dotenv
+CORS_ALLOW_ORIGINS=["http://localhost:5173","https://frontend.example.com"]
+```
+
+来源必须与浏览器的 Origin 一致：协议、主机及端口共同决定来源，不能带末尾 `/`。
+配置载入后保存为不可变 tuple，避免多个应用共享可变白名单。白名单为空时不注册 CORS。
+启用后允许 GET/HEAD/POST/PATCH/DELETE/OPTIONS 和 Authorization、Content-Type、X-Request-ID
+请求头（另有原生 CORS 的安全列表头）；向浏览器暴露 X-Request-ID 与 Content-Disposition。
+方法和头在 `bootstrap/middleware.py` 显式声明，新业务确需其他值时在此修改并测试。
+预检沿用原生 200/400 及纯文本响应，不套业务 JSON envelope；允许的方法不代表端点必然存在。
+
+当前认证通过显式 Bearer 头传输，`allow_credentials=False`；不启用跨域 Cookie。
+CORS 只控制浏览器读取响应，不能替代认证、授权或网络访问控制；不在白名单的普通请求
+仍可能执行，但不返回允许来源头。云签名下载跳转后的跨域规则需由目标桶独立配置。
+新增其他中间件时须验证正常、预检及异常路径的顺序，避免各模块分散注册。
 
 ## 验收
 

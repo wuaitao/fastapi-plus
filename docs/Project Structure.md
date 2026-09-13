@@ -50,7 +50,8 @@ fastapi-plus/
 │   │   │   ├── base.py
 │   │   │   ├── common.py
 │   │   │   ├── descriptors.py
-│   │   │   └── handlers.py
+│   │   │   ├── handlers.py
+│   │   │   └── middleware.py
 │   │   ├── logging/
 │   │   │   ├── __init__.py
 │   │   │   ├── config.py
@@ -142,6 +143,7 @@ fastapi-plus/
 │   ├── reference-modules.md
 │   ├── release.md
 │   ├── roadmap.md
+│   ├── scaffold-review.md
 │   ├── security.md
 │   ├── storage.md
 │   └── testing.md
@@ -159,6 +161,7 @@ fastapi-plus/
 │   │   │       ├── conftest.py
 │   │   │       └── test_user.py
 │   │   ├── test_core.py
+│   │   ├── test_cors.py
 │   │   ├── test_database.py
 │   │   ├── test_health.py
 │   │   └── test_release_openapi.py
@@ -211,6 +214,7 @@ fastapi-plus/
 │   ├── manual_storage_cloud.py
 │   └── storage_fakes.py
 ├── .env.example
+├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
 ├── CHANGELOG.md
@@ -240,6 +244,7 @@ TokenStore 保留 Protocol，AuthService 继续依赖契约，Bootstrap 显式�
 
 保留的辅助文件有当前调用方：
 
+- `core/exceptions/middleware.py` 承接原请求上下文中的未知异常兜底，使错误响应可经过外层 CORS。
 - `database/metadata.py` 显式注册迁移模型，避免自动扫描；`database/diagnostics.py` 执行只读迁移检查。
 - `infrastructure/diagnostics.py` 集中 CLI 所需的外部能力探测；`infrastructure/storage/common.py` 共享安全键名和阻塞调用边界。
 - `modules/user/tasks.py` 保存唯一只读任务与 Handler 示例，沿用 M7 已实现范围。

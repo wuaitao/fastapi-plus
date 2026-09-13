@@ -3,6 +3,9 @@
 M9 为 FastAPI Plus v0.1 完成测试、兼容性、文档和架构加固。
 当前版本仍是 `0.1.0.dev0`；本记录不表示已打标签、发布软件包或部署生产。
 
+全量审计后的新旧脚手架对照与增量收口见 [scaffold-review](scaffold-review.md)，
+包括 CORS、OpenAPI 元数据、换行符及本轮验证；下文原审计/M9 记录保留其历史时点。
+
 ## 最终审计复验
 
 M0–M9 全量审计、目录对齐、TokenStore 精简和安全/并发修复详见 [audit](audit.md)。

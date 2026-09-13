@@ -1,0 +1,2 @@
+# Python 源码与 Ruff 的 line-ending=lf 保持一致，避免 Windows 检出后格式检查失败。
+*.py text eol=lf

@@ -63,8 +63,9 @@ Service 保留资源所有权、不可自删等业务规则，供 CLI/Worker 复
 不内置 Role/Permission 关系表、菜单、部门数据范围、租户、工作流、
 SSO/OAuth/OIDC、验证码平台或复杂授权引擎。
 
-当前未内置 CORS 配置或通用安全响应头中间件；跨域业务按需显式装配 FastAPI 原生 CORS，
-不要同时开放通配来源和 credentials。HSTS 等策略由 HTTPS 部署配置。
+跨域通过 `CORS_ALLOW_ORIGINS` 明确白名单启用 FastAPI 原生 CORS，默认关闭，
+拒绝通配来源且不启用跨域 Cookie 凭据；配置和边界见 [configuration](configuration.md#业务名称与浏览器跨域)。
+CORS 不替代认证或阻止非浏览器访问。未提供通用安全响应头平台，HSTS 等策略由 HTTPS 部署配置。
 文件下载已设置 attachment、no-store 和 nosniff，Token 响应设置 no-store。
 当前认证通过 Authorization 传输；若未来改成自动携带的 Cookie，
 必须重新评估 CSRF 防护，不能将 JWT 等同于无 CSRF 风险。

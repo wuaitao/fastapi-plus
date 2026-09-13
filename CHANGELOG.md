@@ -2,6 +2,11 @@
 
 ## [Unreleased] — 0.1.0.dev0 / M9 Release Hardening
 
+- 对照原 fastapi-scaff 补齐默认关闭的明确来源 CORS，覆盖预检、错误响应、请求 ID 与下载文件名响应头。
+- 将未知异常兜底移到 CORS 内层，上下文留在外层；保持安全错误、日志及流式中止语义。
+- 支持配置 OpenAPI 名称、简介和说明，版本改用已安装项目元数据，与 CLI 保持一致。
+- 固定 Git 检出的 Python 文件为 LF，与 Ruff 一致，修复 Windows 换行符造成的格式检查失败。
+- 新旧项目取舍和本次验证见 [上线收口](docs/scaffold-review.md)；无新增依赖或数据库迁移。
 - 最终审计按设计将 Celery 基类/信号归位为 `base.py`/`signals.py`，Redis/Celery 集成测试归入独立目录，同步导入与文档。
 - 合并 TokenStore 契约与默认空实现，删除没有 I/O 或资源职责的独立 `infrastructure/token_store.py`。
 - 修复认证查询与业务写入共享 Session 导致 SQLite 并发创建返回 500；身份查询结束即释放独立读事务。

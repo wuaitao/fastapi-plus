@@ -65,6 +65,9 @@ M0–M9 完成后已按 [Project Structure](Project%20Structure.md) 复核代码
 API 路径、配置名称、数据库模型和迁移保持不变；可靠性修复与真实验证结果见
 [全量审计](audit.md)。必要辅助文件与不创建的预留项在代码树文档中明确列出。
 
+随后对照原 fastapi-scaff 完成上线前细节收口：新增默认关闭的 CORS 白名单与应用文档元数据配置，
+统一版本来源及 Python 检出换行符；具体取舍与本轮验证见 [scaffold-review](scaffold-review.md)。
+
 ## v0.1 发布门槛
 
 - [x] 干净模板副本按 README 可完成依赖同步、显式迁移、显式管理员创建和开发启动。

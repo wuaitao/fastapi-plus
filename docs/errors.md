@@ -102,7 +102,8 @@ Router 不重复捕获正常业务异常。
 
 原生 HTTPException 的 detail 一律不回显；已知状态使用公共描述符，其余使用
 HTTP 标准短语和 HTTP_ERROR 编号，保留 Allow、WWW-Authenticate、Retry-After 等头。
-请求中间件在框架 DEBUG 错误页之前调用未知异常处理器，所以开发模式也返回安全 JSON。
+SafeExceptionMiddleware 在框架 DEBUG 错误页之前调用未知异常处理器，所以开发模式也返回安全 JSON；
+该层位于 CORS 内侧，错误响应保留跨域头，外侧请求上下文统一附加请求 ID。
 流式响应已开始时无法更改状态或响应体；此时仅记录一次诊断并继续传播异常以中止连接，
 不发送第二组响应头。
 

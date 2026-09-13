@@ -17,6 +17,42 @@ def test_default_settings() -> None:
     assert settings.celery_enabled is False
     assert settings.debug is False
     assert settings.openapi_enabled is True
+    assert settings.app_title == "FastAPI Plus"
+    assert settings.cors_allow_origins == ()
+
+
+def test_cors_origins_sources(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        'CORS_ALLOW_ORIGINS=["http://localhost:5173"]\n', encoding="utf-8"
+    )
+    assert Settings().cors_allow_origins == ("http://localhost:5173",)
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", '["https://frontend.example.com"]')
+    assert Settings().cors_allow_origins == ("https://frontend.example.com",)
+    assert Settings(cors_allow_origins=()).cors_allow_origins == ()
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "*",
+        "null",
+        "https://*.example.com",
+        "example.com",
+        "ftp://example.com",
+        "https://example.com/",
+        "https://example.com/path",
+        "https://user:pass@example.com",
+        "https://example.com?query",
+        "https://example.com#fragment",
+        "https://example.com:bad",
+        "https://example.com:99999",
+        "https://exa mple.com",
+        "https://example.com\n",
+    ],
+)
+def test_invalid_cors_origin_rejected(origin: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(cors_allow_origins=(origin,))
 
 
 @pytest.mark.parametrize("environment", list(Environment))

@@ -1,5 +1,7 @@
 """通过真实应用验证 Health 和 OpenAPI 契约。"""
 
+from importlib.metadata import version
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
@@ -25,6 +27,7 @@ async def test_openapi_generation(settings: Settings) -> None:
     schema = app.openapi()
     assert schema["openapi"].startswith("3.")
     assert schema["info"]["title"] == "FastAPI Plus"
+    assert schema["info"]["version"] == version("fastapi-plus")
     assert set(schema["paths"]) == {
         "/health",
         "/api/v1/users",
@@ -67,3 +70,16 @@ async def test_openapi_visibility_is_independent(environment: Environment, enabl
             for path in ("/openapi.json", "/docs", "/redoc"):
                 assert (await client.get(path)).status_code == (200 if enabled else 404)
             assert (await client.get("/health")).json() == {"status": "ok"}
+
+
+def test_application_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_TITLE", "业务 API")
+    monkeypatch.setenv("APP_SUMMARY", "业务接口简介")
+    monkeypatch.setenv("APP_DESCRIPTION", "接口使用说明")
+    schema = create_app().openapi()
+    assert schema["info"] == {
+        "title": "业务 API",
+        "summary": "业务接口简介",
+        "description": "接口使用说明",
+        "version": version("fastapi-plus"),
+    }
