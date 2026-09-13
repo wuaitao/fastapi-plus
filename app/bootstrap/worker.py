@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def create_worker(settings: Settings | None = None) -> "Celery | None":
-    """独立装配 Worker 日志与任务，未启用 Celery 时返回空值。"""
+    """独立装配 Worker 日志与任务，未启用 Celery 时返回空值"""
     settings = settings if settings is not None else get_settings()
     app = create_celery_app(settings)
     if app is None:

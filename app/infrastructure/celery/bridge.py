@@ -15,10 +15,10 @@ T = TypeVar("T")
 def run_async_handler(
     settings: Settings, handler: Callable[[AsyncSession], Coroutine[Any, Any, T]]
 ) -> T:
-    """在同步任务中运行异步业务，每次调用独占循环、引擎和 Session。"""
+    """在同步任务中运行异步业务，每次调用独占循环、引擎和 Session"""
 
     async def invoke() -> T:
-        """在当前任务循环中创建资源并确保退出时释放。"""
+        """在当前任务循环中创建资源并确保退出时释放"""
         engine = create_engine(settings, null_pool=True)
         try:
             factory = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)

@@ -13,7 +13,7 @@ class RedisSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_redis(self) -> Self:
-        """仅在启用 Redis 时要求有效的连接配置。"""
+        """仅在启用 Redis 时要求有效的连接配置"""
         if self.redis_enabled:
             if self.redis_url is None:
                 raise ValueError("启用 Redis 必须配置 REDIS_URL")

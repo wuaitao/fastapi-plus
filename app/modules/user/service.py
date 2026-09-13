@@ -25,7 +25,7 @@ class UserService:
     async def _check_unique(
         self, username: str, email: str | None, *, exclude_id: int | None = None
     ) -> None:
-        """更新前检查用户名和邮箱冲突，可排除当前用户。"""
+        """更新前检查用户名和邮箱冲突，可排除当前用户"""
         by_username = await self.repository.get_by_username(username)
         if by_username is not None and by_username.id != exclude_id:
             raise BusinessException(USER_ALREADY_EXISTS)
@@ -35,18 +35,18 @@ class UserService:
                 raise BusinessException(USER_ALREADY_EXISTS)
 
     async def create_user(self, data: UserCreate) -> User:
-        """创建普通用户并完成事务，不接受输入指定管理员身份。"""
+        """创建普通用户并完成事务，不接受输入指定管理员身份"""
         return await self._create_user(data, is_superuser=False)
 
     async def create_superuser(self, data: UserCreate) -> User:
-        """在单次事务中创建已激活的超级管理员。"""
+        """在单次事务中创建已激活的超级管理员"""
         # 权限与激活状态在首次提交前设置，避免分两次事务创建半成品管理员。
         return await self._create_user(
             data.model_copy(update={"is_active": True}), is_superuser=True
         )
 
     async def _create_user(self, data: UserCreate, *, is_superuser: bool) -> User:
-        """计算密码哈希后创建用户，以数据库唯一约束处理并发冲突。"""
+        """计算密码哈希后创建用户，以数据库唯一约束处理并发冲突"""
         # Argon2 是阻塞计算；在线程中完成后再开启数据库事务。
         password_hash = await hash_password(data.password.get_secret_value(), self.password_hasher)
         try:
@@ -73,18 +73,18 @@ class UserService:
             raise
 
     async def get_user(self, user_id: int) -> User:
-        """按 ID 查询用户，不存在时抛用户业务异常。"""
+        """按 ID 查询用户，不存在时抛用户业务异常"""
         user = await self.repository.get(user_id)
         if user is None:
             raise BusinessException(USER_NOT_FOUND)
         return user
 
     async def list_users(self, query: UserQuery) -> PageResult[User]:
-        """按已验证的分页参数返回用户模型和总数。"""
+        """按已验证的分页参数返回用户模型和总数"""
         return await self.repository.paginate(page=query.page, size=query.size)
 
     async def update_user(self, user_id: int, data: UserUpdate) -> User:
-        """仅更新显式允许的字段，处理唯一冲突并提交或回滚事务。"""
+        """仅更新显式允许的字段，处理唯一冲突并提交或回滚事务"""
         try:
             user = await self.get_user(user_id)
             username = data.username if data.username is not None else user.username
@@ -107,7 +107,7 @@ class UserService:
             raise
 
     async def delete_user(self, user_id: int, *, actor_id: int) -> None:
-        """禁止操作者自删，删除目标用户并完成事务。"""
+        """禁止操作者自删，删除目标用户并完成事务"""
         try:
             # 自删规则属于业务层，CLI/Worker 调用也必须显式传入操作者。
             if user_id == actor_id:

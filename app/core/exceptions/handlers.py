@@ -35,7 +35,7 @@ def error_response(
     data: ValidationData | None = None,
     headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
-    """根据安全错误描述符生成响应，并保留请求 ID 和必要的 HTTP 头。"""
+    """根据安全错误描述符生成响应，并保留请求 ID 和必要的 HTTP 头"""
     request_id: str | None = getattr(request.state, "request_id", None)
     body = ErrorResponse(
         code=descriptor.code, message=descriptor.message, data=data, request_id=request_id
@@ -53,13 +53,13 @@ def error_response(
 
 
 async def app_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """将已定义的应用异常映射为稳定业务响应。"""
+    """将已定义的应用异常映射为稳定业务响应"""
     assert isinstance(exc, AppException)
     return error_response(request, exc.descriptor)
 
 
 async def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """输出安全的字段校验信息，不回显输入值或自定义异常正文。"""
+    """输出安全的字段校验信息，不回显输入值或自定义异常正文"""
     assert isinstance(exc, RequestValidationError)
     issues: list[ValidationIssue] = []
     for error in exc.errors():
@@ -79,7 +79,7 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
 
 
 async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """保留框架错误的 HTTP 语义，使用安全消息替代原始 detail。"""
+    """保留框架错误的 HTTP 语义，使用安全消息替代原始 detail"""
     assert isinstance(exc, HTTPException)
     descriptor = _HTTP_ERRORS.get(exc.status_code)
     if descriptor is None:
@@ -93,7 +93,7 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
 
 
 async def unexpected_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """记录一次安全诊断，将明确的暂时性数据库故障映射为 503，其余为 500。"""
+    """记录一次安全诊断，将明确的暂时性数据库故障映射为 503，其余为 500"""
     # 流式响应开始后异常会继续传播到框架兜底，避免再次记录同一诊断。
     if not getattr(request.state, "exception_logged", False):
         logger.error("request.failed", **exception_diagnostics(exc))

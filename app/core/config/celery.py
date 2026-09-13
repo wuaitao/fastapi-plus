@@ -14,7 +14,7 @@ class CelerySettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_celery(self) -> Self:
-        """仅在启用任务时校验 Broker 与可选结果后端的 URL。"""
+        """仅在启用任务时校验 Broker 与可选结果后端的 URL"""
         if self.celery_enabled:
             if self.celery_broker_url is None:
                 raise ValueError("启用 Celery 必须配置 CELERY_BROKER_URL")

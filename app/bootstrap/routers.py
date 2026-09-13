@@ -23,7 +23,7 @@ async def health() -> HealthResponse:
 
 
 def register_routers(app: FastAPI) -> None:
-    """显式挂载健康检查和业务路由，新增模块在此注册。"""
+    """显式挂载健康检查和业务路由，新增模块在此注册"""
     app.include_router(health_router)
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(user_router, prefix="/api/v1")

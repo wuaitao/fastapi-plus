@@ -12,9 +12,9 @@ class UserRepository(BaseRepository[User]):
         super().__init__(session, User)
 
     async def get_by_username(self, username: str) -> User | None:
-        """按唯一用户名查询用户，不存在时返回空值。"""
+        """按唯一用户名查询用户，不存在时返回空值"""
         return await self.session.scalar(select(User).where(User.username == username))
 
     async def get_by_email(self, email: str) -> User | None:
-        """按唯一邮箱查询用户，不存在时返回空值。"""
+        """按唯一邮箱查询用户，不存在时返回空值"""
         return await self.session.scalar(select(User).where(User.email == email))

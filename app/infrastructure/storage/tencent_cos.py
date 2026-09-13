@@ -27,7 +27,7 @@ class TencentCOSStorage:
     async def put(
         self, key: str, content: BinaryIO, *, size: int, content_type: str, visibility: Visibility
     ) -> StoredObject:
-        """将流上传到 COS，按可见性设置对象前缀和 ACL。"""
+        """将流上传到 COS，按可见性设置对象前缀和 ACL"""
         await storage_io(
             self._client.put_object,
             Bucket=self.bucket,
@@ -40,11 +40,11 @@ class TencentCOSStorage:
         return StoredObject(key, size)
 
     async def exists(self, key: str, *, visibility: Visibility) -> bool:
-        """查询 COS 对象，仅将明确的对象缺失识别为不存在。"""
+        """查询 COS 对象，仅将明确的对象缺失识别为不存在"""
         remote_key = object_key(key, visibility)
 
         def head() -> bool:
-            """区分对象缺失与桶、鉴权或网络故障。"""
+            """区分对象缺失与桶、鉴权或网络故障"""
             try:
                 self._client.head_object(Bucket=self.bucket, Key=remote_key)
             except self._service_error as error:
@@ -62,13 +62,13 @@ class TencentCOSStorage:
         return await storage_io(head)
 
     async def delete(self, key: str, *, visibility: Visibility) -> None:
-        """幂等删除 COS 对象，保留存储失败语义。"""
+        """幂等删除 COS 对象，保留存储失败语义"""
         await storage_io(
             self._client.delete_object, Bucket=self.bucket, Key=object_key(key, visibility)
         )
 
     async def access(self, key: str, *, visibility: Visibility, filename: str) -> RemoteAccess:
-        """签发五分钟有效的下载 URL，并附带原始下载文件名。"""
+        """签发五分钟有效的下载 URL，并附带原始下载文件名"""
         url = await storage_io(
             self._client.get_presigned_url,
             Bucket=self.bucket,

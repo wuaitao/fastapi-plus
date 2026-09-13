@@ -19,10 +19,10 @@ depends_on: str | Sequence[str] | None = ${repr(depends_on)}
 
 
 def upgrade() -> None:
-    """升级数据库结构；提交前人工审查自动生成的操作。"""
+    """升级数据库结构；提交前人工审查自动生成的操作"""
     ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
-    """回退本版本的数据库结构。"""
+    """回退本版本的数据库结构"""
     ${downgrades if downgrades else "pass"}

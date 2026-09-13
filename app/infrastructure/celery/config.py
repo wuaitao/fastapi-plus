@@ -4,7 +4,7 @@ from app.core.config import Settings
 
 
 def celery_configuration(settings: Settings) -> dict[str, object]:
-    """生成原生 Celery 配置，限制 JSON 序列化、重试和任务超时。"""
+    """生成原生 Celery 配置，限制 JSON 序列化、重试和任务超时"""
     assert settings.celery_broker_url is not None
     return {
         "broker_url": settings.celery_broker_url.get_secret_value(),

@@ -36,6 +36,6 @@ class DatabaseSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_database(self) -> Self:
-        """在加载配置时验证数据库类型和异步连接串的一致性。"""
+        """在加载配置时验证数据库类型和异步连接串的一致性"""
         _ = self.sqlalchemy_url
         return self

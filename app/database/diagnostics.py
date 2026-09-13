@@ -12,7 +12,7 @@ from app.database.engine import create_engine
 
 
 async def current_heads(settings: Settings) -> tuple[str, ...]:
-    """只读查询数据库迁移版本，SQLite 文件缺失时不隐式创建数据库。"""
+    """只读查询数据库迁移版本，SQLite 文件缺失时不隐式创建数据库"""
     if settings.database == "sqlite":
         url = settings.sqlalchemy_url
         database = url.database or ""

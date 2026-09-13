@@ -1,4 +1,4 @@
-"""创建用户表及具名唯一约束。"""
+"""创建用户表及具名唯一约束"""
 
 from collections.abc import Sequence
 

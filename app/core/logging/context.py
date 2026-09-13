@@ -17,7 +17,7 @@ class RequestContextMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """为 HTTP 请求绑定隔离上下文，记录耗时并在结束后恢复调用方上下文。"""
+        """为 HTTP 请求绑定隔离上下文，记录耗时并在结束后恢复调用方上下文"""
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -34,7 +34,7 @@ class RequestContextMiddleware:
         status_code = 500
 
         async def send_with_request_id(message: Message) -> None:
-            """向响应头写入请求 ID，并记录实际发送的状态码。"""
+            """向响应头写入请求 ID，并记录实际发送的状态码"""
             nonlocal status_code
             if message["type"] == "http.response.start":
                 MutableHeaders(scope=message)["X-Request-ID"] = request_id

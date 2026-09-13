@@ -33,7 +33,7 @@ class BaseTask(TaskBase):
     retry_jitter = True
 
     def __call__(self, *args: Any, **kwargs: Any) -> object:
-        """隔离任务上下文，验证 JSON 边界并记录完成或失败事件。"""
+        """隔离任务上下文，验证 JSON 边界并记录完成或失败事件"""
         previous = structlog.contextvars.get_contextvars()
         structlog.contextvars.clear_contextvars()
         headers = self.request.headers or {}

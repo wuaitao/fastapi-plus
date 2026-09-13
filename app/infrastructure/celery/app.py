@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def create_celery_app(settings: Settings) -> "Celery | None":
-    """按需创建 Celery 应用及发送信号，不连接 Broker 或启动 Worker。"""
+    """按需创建 Celery 应用及发送信号，不连接 Broker 或启动 Worker"""
     if not settings.celery_enabled:
         return None
     try:

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 async def user_status_handler(session: AsyncSession, user_id: int) -> dict[str, int | bool]:
-    """校验 JSON 用户 ID，通过用户服务返回只读状态。"""
+    """校验 JSON 用户 ID，通过用户服务返回只读状态"""
     if type(user_id) is not int or user_id <= 0:
         raise ValueError("user_id 必须是正整数")
     service = UserService(UserRepository(session), get_password_hasher())
@@ -25,15 +25,15 @@ async def user_status_handler(session: AsyncSession, user_id: int) -> dict[str, 
 
 
 def register_user_tasks(app: "Celery", settings: Settings) -> None:
-    """向当前 Worker 显式注册用户状态任务。"""
+    """向当前 Worker 显式注册用户状态任务"""
     from app.infrastructure.celery.base import BaseTask, TransientTaskError
 
     @app.task(name="user.status", base=BaseTask, shared=False)
     def user_status(user_id: int) -> dict[str, int | bool]:
-        """桥接异步查询，仅把明确的暂时性数据库故障交给有限重试。"""
+        """桥接异步查询，仅把明确的暂时性数据库故障交给有限重试"""
 
         async def handle(session: AsyncSession) -> dict[str, int | bool]:
-            """将当前任务 Session 交给异步用户状态查询。"""
+            """将当前任务 Session 交给异步用户状态查询"""
             return await user_status_handler(session, user_id)
 
         try:

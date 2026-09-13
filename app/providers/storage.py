@@ -32,11 +32,11 @@ class StorageProvider(Protocol):
     async def put(
         self, key: str, content: BinaryIO, *, size: int, content_type: str, visibility: Visibility
     ) -> StoredObject:
-        """保存指定大小的内容流，返回对象键和实际大小，不负责业务授权。"""
+        """保存指定大小的内容流，返回对象键和实际大小，不负责业务授权"""
         ...
 
     async def exists(self, key: str, *, visibility: Visibility) -> bool:
-        """返回对象是否存在，连接或权限故障必须抛异常。"""
+        """返回对象是否存在，连接或权限故障必须抛异常"""
         ...
 
     async def delete(self, key: str, *, visibility: Visibility) -> None:
@@ -54,13 +54,13 @@ class StorageRegistry:
         self._providers: dict[str, StorageProvider] = {}
 
     def register(self, backend: str, provider: StorageProvider) -> None:
-        """按唯一后端名注册能力，拒绝空名称和重复覆盖。"""
+        """按唯一后端名注册能力，拒绝空名称和重复覆盖"""
         if not backend or backend in self._providers:
             raise ValueError("存储后端名称不能为空或重复")
         self._providers[backend] = provider
 
     def get(self, backend: str | None = None) -> StorageProvider:
-        """选择指定或默认后端，历史后端缺失时明确失败。"""
+        """选择指定或默认后端，历史后端缺失时明确失败"""
         try:
             return self._providers[backend if backend is not None else self.default_backend]
         except KeyError:

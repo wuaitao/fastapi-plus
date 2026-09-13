@@ -26,7 +26,7 @@ FileId = Annotated[int, Path(gt=0, le=9223372036854775807)]
 
 
 def metadata(record: FileRecord, request: Request) -> FileResponse:
-    """转换公开元数据，仅为 public 文件生成当前应用的下载路由 URL。"""
+    """转换公开元数据，仅为 public 文件生成当前应用的下载路由 URL"""
     result = FileResponse.model_validate(record)
     if record.visibility == "public":
         # URL 来自当前路由，不保存厂商地址；私有响应始终保持 null。

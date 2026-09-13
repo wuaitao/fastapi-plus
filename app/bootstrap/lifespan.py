@@ -33,7 +33,7 @@ async def startup(app: FastAPI) -> None:
         celery = app.state.celery
 
         def check_broker() -> None:
-            """检查已启用的 Broker 连接，失败时仅返回安全提示。"""
+            """检查已启用的 Broker 连接，失败时仅返回安全提示"""
             try:
                 with celery.connection_for_write() as connection:
                     connection.ensure_connection(max_retries=0)
@@ -65,7 +65,7 @@ async def shutdown(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """统一管理启动与关闭，启动中途失败也释放已创建资源。"""
+    """统一管理启动与关闭，启动中途失败也释放已创建资源"""
     # 即使启动或运行阶段抛错，也执行集中关闭钩子。
     try:
         await startup(app)

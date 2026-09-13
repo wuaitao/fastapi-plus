@@ -22,7 +22,7 @@ _BEARER = re.compile(r"\b(?:Bearer|Basic)\s+[^\s,;\"']+", re.I)
 
 
 def redact_text(value: str) -> str:
-    """隐藏文本中带标签的凭据、认证头和敏感 URL。"""
+    """隐藏文本中带标签的凭据、认证头和敏感 URL"""
     # 含用户信息或查询参数的 URL 整体隐藏，避免连接凭据和签名链接泄漏。
     value = _URL.sub(
         lambda match: REDACTED if "@" in match[0] or "?" in match[0] else match[0], value
@@ -31,7 +31,7 @@ def redact_text(value: str) -> str:
 
 
 def _redact(value: object) -> object:
-    """递归复制并脱敏结构化数据，未知对象不调用其字符串表示。"""
+    """递归复制并脱敏结构化数据，未知对象不调用其字符串表示"""
     if isinstance(value, Mapping):
         return {
             str(key): REDACTED if _SENSITIVE_KEY.search(str(key)) else _redact(item)
@@ -48,7 +48,7 @@ def _redact(value: object) -> object:
 
 
 def exception_diagnostics(exc: BaseException) -> dict[str, object]:
-    """提取异常类型和栈帧位置，避免泄漏异常正文或局部变量。"""
+    """提取异常类型和栈帧位置，避免泄漏异常正文或局部变量"""
     # 只保留异常类型与调用位置；不提取源码、路径、异常文本或局部变量。
     return {
         "error_type": type(exc).__name__,
@@ -60,7 +60,7 @@ def exception_diagnostics(exc: BaseException) -> dict[str, object]:
 
 
 def redact_sensitive_fields(logger: object, method_name: str, event_dict: EventDict) -> EventDict:
-    """在最终渲染前移除原始异常信息并脱敏全部日志字段。"""
+    """在最终渲染前移除原始异常信息并脱敏全部日志字段"""
     for key in ("exc_info", "exception", "stack", "stack_info"):
         event_dict.pop(key, None)
     return cast(EventDict, _redact(event_dict))

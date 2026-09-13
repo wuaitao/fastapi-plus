@@ -13,7 +13,7 @@ class SecuritySettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_secret(self) -> Self:
-        """检查显式 JWT 密钥的字节长度，避免使用过短密钥。"""
+        """检查显式 JWT 密钥的字节长度，避免使用过短密钥"""
         if self.jwt_secret is not None and len(self.jwt_secret.get_secret_value().encode()) < 32:
             raise ValueError("JWT_SECRET 至少需要 32 字节的随机秘密")
         return self
