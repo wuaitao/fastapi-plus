@@ -1,0 +1,68 @@
+"""认证业务复用用户查询与安全能力，不依赖 HTTP 入口"""
+
+from argon2 import PasswordHasher
+
+from app.core.exceptions import AuthenticationException, AuthorizationException
+from app.core.security.password import verify_password
+from app.core.security.token import TokenClaims, TokenPair, TokenProvider, TokenType
+from app.modules.user.errors import USER_DISABLED
+from app.modules.user.model import User
+from app.modules.user.repository import UserRepository
+from app.providers.token_store import TokenStore
+
+
+class AuthService:
+    def __init__(
+        self,
+        repository: UserRepository,
+        password_hasher: PasswordHasher,
+        token_provider: TokenProvider,
+        token_store: TokenStore,
+        dummy_password_hash: str,
+    ) -> None:
+        self.repository = repository
+        self.password_hasher = password_hasher
+        self.token_provider = token_provider
+        self.token_store = token_store
+        self.dummy_password_hash = dummy_password_hash
+
+    async def login(self, username: str, password: str) -> TokenPair:
+        user = await self.repository.get_by_username(username)
+        valid = await verify_password(
+            password,
+            user.password_hash if user is not None else self.dummy_password_hash,
+            self.password_hasher,
+        )
+        if not valid or user is None or not user.is_active:
+            raise AuthenticationException()
+        return self.token_provider.create_pair(str(user.id))
+
+    async def _authenticate(self, token: str, token_type: TokenType) -> tuple[User, TokenClaims]:
+        claims = self.token_provider.decode_token(token, token_type)
+        if await self.token_store.is_revoked(claims.jti):
+            raise AuthenticationException()
+        # sub 是字符串，但用户主键必须是数据库可接受的正整数，避免溢出导致 500。
+        if not claims.sub.isascii() or not claims.sub.isdecimal() or len(claims.sub) > 19:
+            raise AuthenticationException()
+        user_id = int(claims.sub)
+        if not 0 < user_id <= 9223372036854775807:
+            raise AuthenticationException()
+        user = await self.repository.get(user_id)
+        if user is None:
+            raise AuthenticationException()
+        if not user.is_active:
+            raise AuthorizationException(USER_DISABLED)
+        return user, claims
+
+    async def refresh(self, refresh_token: str) -> TokenPair:
+        user, _ = await self._authenticate(refresh_token, "refresh")
+        # 默认不消费旧 refresh token；轮换与防重放需要有状态存储。
+        return self.token_provider.create_pair(str(user.id))
+
+    async def logout(self, access_token: str) -> None:
+        _, claims = await self._authenticate(access_token, "access")
+        await self.token_store.revoke(claims.jti, claims.exp)
+
+    async def get_current_user(self, access_token: str) -> User:
+        user, _ = await self._authenticate(access_token, "access")
+        return user
