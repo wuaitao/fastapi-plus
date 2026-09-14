@@ -33,7 +33,9 @@ def utc_now() -> datetime:
 
 class TimestampMixin:
     # 时间由 SQLAlchemy 写入；原始 SQL 写入者也必须显式维护这两个字段。
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=utc_now, nullable=False, comment="创建时间（UTC）"
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        UTCDateTime(), default=utc_now, onupdate=utc_now, nullable=False
+        UTCDateTime(), default=utc_now, onupdate=utc_now, nullable=False, comment="更新时间（UTC）"
     )

@@ -42,6 +42,12 @@ class Settings(
             raise ValueError("生产环境禁止启用 DEBUG")
         if self.environment == Environment.PRODUCTION and self.jwt_secret is None:
             raise ValueError("生产环境必须配置 JWT_SECRET")
+        if self.login_rate_limit_enabled and not self.redis_enabled:
+            raise ValueError("启用登录限流必须同时启用 REDIS_ENABLED")
+        if self.request_max_body_size <= self.file_max_size:
+            raise ValueError(
+                "REQUEST_MAX_BODY_SIZE 必须大于 FILE_MAX_SIZE，为 multipart 编码留余量"
+            )
         return self
 
 

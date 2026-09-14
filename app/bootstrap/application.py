@@ -35,7 +35,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             for status, description in (
                 (404, "Not found"),
                 (405, "Method not allowed"),
+                (413, "Request body too large"),
                 (422, "Validation error"),
+                (429, "Too many requests"),
                 (500, "Internal server error"),
                 (503, "Service unavailable"),
             )
@@ -44,6 +46,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     register_providers(app, settings)
     register_exception_handlers(app)
+    if settings.metrics_enabled:
+        try:
+            from app.infrastructure.metrics import register_metrics
+        except ImportError:
+            raise RuntimeError("指标依赖未安装，请安装 metrics extra") from None
+
+        register_metrics(app)
     register_middleware(app, settings)
     register_routers(app)
     return app

@@ -10,6 +10,12 @@ class SecuritySettings(BaseSettings):
     jwt_secret: SecretStr | None = Field(default=None, repr=False, exclude=True)
     access_token_expire_minutes: int = Field(default=30, gt=0, le=1440)
     refresh_token_expire_days: int = Field(default=7, gt=0, le=365)
+    # 包含 multipart 编码开销，默认比单文件 10 MiB 上限多留 1 MiB。
+    request_max_body_size: int = Field(default=11534336, gt=0)
+    login_rate_limit_enabled: bool = False
+    login_rate_limit_capacity: int = Field(default=5, ge=1)
+    login_rate_limit_period: int = Field(default=60, ge=1)
+    login_rate_limit_prefix: str = Field(default="fastplus:login", min_length=1)
 
     @model_validator(mode="after")
     def validate_secret(self) -> Self:

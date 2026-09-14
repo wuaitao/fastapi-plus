@@ -6,9 +6,17 @@ from urllib.parse import unquote
 
 from alembic.runtime.migration import MigrationContext
 from pydantic import SecretStr
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.config import Settings
 from app.database.engine import create_engine
+
+
+async def check_connection(engine: AsyncEngine) -> None:
+    """通过应用现有连接池执行只读探测，完成或取消时释放连接"""
+    async with engine.connect() as connection:
+        await connection.execute(text("SELECT 1"))
 
 
 async def current_heads(settings: Settings) -> tuple[str, ...]:

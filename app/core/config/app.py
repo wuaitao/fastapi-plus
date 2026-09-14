@@ -21,6 +21,19 @@ class AppSettings(BaseSettings):
     debug: bool = False
     openapi_enabled: bool = True
     cors_allow_origins: tuple[str, ...] = ()
+    allowed_hosts: tuple[str, ...] = ()
+    readiness_timeout: float = Field(default=3, gt=0, allow_inf_nan=False)
+    metrics_enabled: bool = False
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def validate_allowed_hosts(cls, hosts: tuple[str, ...]) -> tuple[str, ...]:
+        """只接受主机名或子域通配符，空列表表示不启用 Host 校验"""
+        for host in hosts:
+            name = host.removeprefix("*.")
+            if not name or any(c in name for c in "*/:@?#") or any(c.isspace() for c in name):
+                raise ValueError("ALLOWED_HOSTS 必须为主机名，可使用 *.example.com，不含端口")
+        return hosts
 
     @field_validator("cors_allow_origins")
     @classmethod

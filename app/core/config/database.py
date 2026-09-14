@@ -2,7 +2,7 @@
 
 from typing import Literal, Self
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import ArgumentError
@@ -11,6 +11,11 @@ from sqlalchemy.exc import ArgumentError
 class DatabaseSettings(BaseSettings):
     database: Literal["sqlite", "postgresql", "mysql"] = "sqlite"
     database_url: SecretStr = SecretStr("sqlite+aiosqlite:///./data/app.db")
+    # 每个进程独立持有连接池；禁止无限池和无限溢出，便于计算连接预算。
+    database_pool_size: int = Field(default=5, ge=1)
+    database_max_overflow: int = Field(default=10, ge=0)
+    database_pool_timeout: float = Field(default=30, gt=0, allow_inf_nan=False)
+    database_pool_recycle: int = Field(default=1800, ge=-1)
 
     @property
     def sqlalchemy_url(self) -> URL:

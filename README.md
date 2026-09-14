@@ -52,7 +52,7 @@
 └── LICENSE
 ```
 
-运行时的 `data/`（数据库、文件）和 `logs/`（可选日志）不进入版本控制。`docs/`、`tests/` 初始仅含占位文件，按实际业务添加内容。
+运行时的 `data/`（数据库、文件）和 `logs/`（可选日志）不进入版本控制。`tests/` 包含部署基础能力的回归测试，按实际业务继续添加用例。
 
 ## 安装与启动
 
@@ -79,6 +79,7 @@ uv run uvicorn app.main:app --reload
 | 地址 | 用途 |
 | --- | --- |
 | `http://127.0.0.1:8000/health` | 存活检查，返回 `{"status":"ok"}` |
+| `http://127.0.0.1:8000/health/ready` | 数据库与已启用 Redis 就绪检查，失败返回 503 |
 | `http://127.0.0.1:8000/docs` | Swagger UI，可直接调试接口 |
 | `http://127.0.0.1:8000/redoc` | ReDoc 接口文档 |
 | `http://127.0.0.1:8000/openapi.json` | OpenAPI 定义 |
@@ -97,14 +98,23 @@ uv run uvicorn app.main:app --reload
 | `APP_SUMMARY` / `APP_DESCRIPTION` | 空，接口文档简介与详细说明 |
 | `OPENAPI_ENABLED` | `true`，控制 Swagger、ReDoc 和 OpenAPI 入口 |
 | `CORS_ALLOW_ORIGINS` | `[]`，跨域来源 JSON 数组，空数组关闭 CORS |
+| `ALLOWED_HOSTS` | `[]`，空数组关闭 Host 校验；启用时填写主机名，可用 `*.example.com` |
+| `READINESS_TIMEOUT` | `3` 秒，readiness 检查总超时 |
+| `METRICS_ENABLED` | `false`，安装 `metrics` extra 后可启用 `/metrics` |
 | `DATABASE` | `sqlite`，可选 `postgresql`、`mysql` |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/app.db` |
+| `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` | `5` / `10`，PostgreSQL/MySQL 每进程常驻池容量与额外连接上限 |
+| `DATABASE_POOL_TIMEOUT` / `DATABASE_POOL_RECYCLE` | `30` / `1800` 秒，借连接等待超时与复用前回收年龄；回收可设 `-1` 关闭 |
 | `JWT_SECRET` | 开发未设置时生成实例级临时密钥；生产必须设置至少 32 字节随机秘密 |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30`，范围 1–1440 分钟 |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7`，范围 1–365 天 |
 | `STORAGE_BACKEND` | `local`，可选 `oss`、`cos` |
 | `STORAGE_LOCAL_ROOT` | `data/storage` |
 | `FILE_MAX_SIZE` | `10485760` 字节，即 10 MiB |
+| `REQUEST_MAX_BODY_SIZE` | `11534336` 字节，即 11 MiB，整个请求体上限，须大于文件上限以容纳 multipart 开销 |
+| `LOGIN_RATE_LIMIT_ENABLED` | `false`；启用时必须同时配置 Redis |
+| `LOGIN_RATE_LIMIT_CAPACITY` / `LOGIN_RATE_LIMIT_PERIOD` | `5` 次 / `60` 秒，按客户端 IP 的令牌桶容量和补充周期 |
+| `LOGIN_RATE_LIMIT_PREFIX` | `fastplus:login`，同一应用多实例共用，不同应用使用不同前缀 |
 | `LOG_LEVEL` | `INFO`，支持 DEBUG / INFO / WARNING / ERROR / CRITICAL |
 | `LOG_FORMAT` | 未设置时开发/测试为 `console`，生产为 `json`；仅控制控制台格式 |
 | `LOG_FILE_PATH` | 未设置时仅输出控制台；指定文件路径后同时落盘 |
@@ -164,7 +174,7 @@ logger.info("order.created", order_id=order.id)
 
 不要记录密码、Token、完整请求体、SQL 参数或签名 URL。未知异常不会输出原始异常文本和局部变量；日志脱敏是兜底，业务仍须选择安全字段。开启文件输出后需确保目录可写，日志文件不要对外公开。
 
-`fastplus doctor` 只读检查数据库连接、迁移状态、存储目录和已启用组件，不创建数据库或修复目录；开启文件日志时，命令的日志初始化仍会创建日志目录/文件。`/health` 仅表示进程存活。
+`fastplus doctor` 只读检查数据库连接、迁移状态、存储目录和已启用组件，不创建数据库或修复目录；开启文件日志时，命令的日志初始化仍会创建日志目录/文件。`/health` 仅表示进程存活；`/health/ready` 在限时内通过现有连接池执行 `SELECT 1`，并检查已启用 Redis，返回 200 或不带底层错误信息的 503。它不核对迁移版本或检查云存储、Broker，也不保证后续业务成功；发布前仍需显式迁移并运行 `doctor`。SQLite 应先初始化数据库，普通应用连接会按驱动行为创建缺失文件。
 
 ## 接口使用
 
@@ -182,7 +192,11 @@ JSON 业务接口使用 `code/message/data`，同时保留真实 HTTP 状态；�
 
 文件上传使用 multipart 的 `file` 字段和可选 `visibility`（`private` / `public`），默认私有。私有元数据和下载仅所有者或超级管理员可访问；公开文件可匿名读取，删除仍需所有者或管理员权限。支持 txt/pdf/png/jpg/jpeg/bin，扩展名与 MIME 对应关系在 [FileService](app/modules/file/service.py) 中维护。
 
-本地文件保存到 `data/storage/{private,public}`，不静态挂载。下载返回文件流，云下载返回 307 短期签名地址，均不套 JSON 响应。大小和 MIME 校验不等于内容扫描，部署层应另设请求体大小限制。
+本地文件保存到 `data/storage/{private,public}`，不静态挂载。下载返回文件流，云下载返回 307 短期签名地址，均不套 JSON 响应。应用通过 Starlette 在读取过程中限制整个请求体，覆盖 multipart、无 Content-Length 和分块传输，超限返回统一 413；文件服务仍单独校验 `FILE_MAX_SIZE`。大小和 MIME 校验不等于内容扫描；应用限额也不限制并发上传总量和接入带宽，部署层仍应设置相应容量与连接限制。
+
+公网登录应开启 `LOGIN_RATE_LIMIT_ENABLED=true`（需 Redis），或由实际接入层提供等效限流。应用限流在密码解析和 Argon2 之前执行，成功、失败和无效格式的登录尝试都消耗额度；默认允许每 IP 突发 5 次，此后每 12 秒补充 1 次。超额返回 429 和 `Retry-After`，Redis 故障或 2 秒超时返回 503，不自动放行。多 Worker/多实例必须连接同一 Redis 并使用相同前缀。该策略不持久锁定账户，不能替代针对分布式攻击的接入防护；共享出口 IP 的用户也共享额度。
+
+限流使用 ASGI 客户端地址，不直接读取 `X-Forwarded-For`。经过代理时，Uvicorn 的 `--forwarded-allow-ips` 只能信任实际代理地址，避免伪造 IP 绕过限流；同时避免将所有用户误判为代理 IP。直连暴露时配置 `ALLOWED_HOSTS`；启用后需将探针使用的 Host 加入允许列表。Host 校验的 400 保留 Starlette 的纯文本响应，其他 JSON 业务错误仍遵守统一契约。
 
 ## 数据库与常用命令
 
@@ -208,6 +222,10 @@ PostgreSQL 使用 `DATABASE=postgresql` 和 `postgresql+asyncpg://...` 连接串
 | `uv run --no-sync fastplus create-superuser` | 交互创建管理员 |
 
 自动生成的迁移必须检查后再执行。应用启动不自动建表、迁移或初始化账号。已应用的迁移应保留，模型变化通过新增迁移表达。
+
+表及字段附中文 `comment`，通过 `0003_add_comments` 为已有 PostgreSQL/MySQL 补齐注释。SQLite 不支持持久化表/列注释，该迁移只推进版本，不重建表；模型中的注释仍可供开发工具使用。
+
+连接池按**进程**创建，Web 连接预算上限为 `实例数 × Worker 数 × (DATABASE_POOL_SIZE + DATABASE_MAX_OVERFLOW)`，还要给 CLI、Celery、迁移、监控及其他应用预留连接。默认 4 Worker 的上限是 60，连接按需创建，不代表启动就占满 60。例如 4 Worker 配置 `3 + 2`，Web 上限为 20；按实际并发与数据库容量调整。SQLite 保留驱动默认池策略，忽略 size/overflow/timeout；CLI 和短期任务使用 NullPool 时也不传队列池参数。`POOL_TIMEOUT` 不是查询执行超时，`POOL_RECYCLE` 也不是空闲连接自动关闭时间。
 
 ## 可选存储与任务
 
@@ -291,11 +309,10 @@ solo 模式不提供 prefork 的软/硬任务超时保障。Web 不会自动启�
 uv run --no-sync ruff check .
 uv run --no-sync ruff format --check .
 uv run --no-sync pyright
-# 添加业务测试后执行
 uv run --no-sync pytest
 ```
 
-`tests/` 初始为空，Pytest 的“未收集到测试”（退出码 5）不代表测试通过。测试使用临时目录、独立配置和专用数据库，不读取开发者 `.env` 或操作生产资源。项目保留测试工具和基础配置，具体业务自行建立所需用例。
+测试使用临时目录、独立配置和 SQLite，Redis 限流脚本使用 fakeredis + Lua 模拟器，不读取开发者 `.env` 或操作生产资源。PostgreSQL/MySQL 注释迁移验证离线 SQL；目标数据库与真实 Redis 仍需在部署环境验证。GitHub Actions 在 push / pull request 执行锁定安装、Ruff lint/format、严格 Pyright 和 Pytest。
 
 ## 部署
 
@@ -316,6 +333,45 @@ uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 首次部署另行交互创建管理员。生产不用 `--reload`；HTTPS、进程管理、访问限制、请求体上限、日志留存和备份由部署环境配置。上线前在目标数据库与实际启用的存储、Broker 上验证业务流程。数据库与文件对象需协调备份，迁移降级不能替代备份恢复。
 
+### 多进程与就绪探针
+
+Uvicorn 原生支持多 Worker，使用命令行配置即可，不需要在应用 Settings 中重复实现进程管理：
+
+```bash
+uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+`--workers` 与 `--reload` 互斥。每个进程会独立启动 lifespan、连接池和可选客户端，必须共享固定 `JWT_SECRET`，并取消共享 `LOG_FILE_PATH`。生产并发写入应使用 PostgreSQL/MySQL；SQLite 允许多进程访问，但写锁竞争使它不适合作为多 Worker 并发写入方案。“SQLite 绝对不能多 Worker”并不准确。
+
+同机多 Worker 可以访问同一个 Local 目录；跨机器多实例必须使用共享存储或 OSS/COS，否则其他实例无法读取已上传文件。文件存储和数据库自身的高可用、备份仍由部署环境负责。
+
+编排环境将 liveness 指向 `/health`，readiness 指向 `/health/ready`，探针超时应大于 `READINESS_TIMEOUT`。例如每 10 秒探测、超时 5 秒、连续失败 3 次移出流量；迁移应在发布步骤单独执行。进程数增加本身不等于高可用，还需配置滚动更新、流量摘除和优雅退出。
+
+### 可选基础指标
+
+```bash
+uv sync --locked --extra metrics
+```
+
+配置 `METRICS_ENABLED=true` 后提供 `/metrics`（Prometheus 文本，不进入 OpenAPI），必须通过实际网络策略只允许监控系统访问。关闭时不加载指标依赖，也不暴露端点。
+
+当前指标使用进程独立注册表：**每个被采集的地址只运行一个 Worker，通过多实例扩容并逐个采集**。不要对 `--workers 4` 的共享端口或负载均衡地址直接采集，这会随机读取单个进程，导致计数与延迟统计失真。传统同端口多 Worker 部署可关闭本功能并使用接入层指标；需要进程聚合时再按 Prometheus 官方 multiprocess 生命周期约定集成，不能仅加环境变量就视作已支持。
+
+| 指标 | 用途 |
+| --- | --- |
+| `http_requests_total{method,route,status}` | 请求量和状态码；`rate(...[5m])` 得到 QPS |
+| `http_request_duration_seconds_bucket` | 延迟分布，可用 `histogram_quantile` 计算 P99 |
+| `db_pool_checked_out` | 当前进程借出的连接数 |
+| `db_pool_size` | 常驻队列池容量，不含 overflow；内存 SQLite/无队列池时为 0 |
+
+路由标签使用 `/users/{user_id}` 这类模板，未知路径归为 `unmatched`，不包含实际 ID、query、IP 或 Token。探针和 `/metrics` 不计入 HTTP 指标。延迟包含响应流及请求结束阶段，不等同于数据库耗时；流开始后失败仍保留已发送的状态码，排障需结合错误日志。
+
+例如跨实例 P99：`histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))`。HTTP 5xx 比例：`sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))`，无请求时分母为零，告警规则需处理低流量。抓取、保存和告警规则由实际监控平台配置；Celery 积压、数据库服务端与主机磁盘指标应由相应 exporter 提供，本项目不启动监控服务器。
+
+### 按业务再补的能力
+
+Beat 调度、用户缓存、存储配额、业务审计日志和更严格的密码策略按业务引入。当前认证每次查询用户，保留禁用立即生效；CLI 已复用 8–128 字符密码校验，建议管理员使用密码管理器生成的长随机密码。没有定时任务时无需预置空调度器；引入 Beat 时必须单独部署且保持单调度实例、任务幂等。CSP、HSTS 和防嵌入响应头按实际 HTTPS/前端策略配置，不为通用 API 强制套用可能破坏文档页的策略。本项目不内置 Docker、Compose 或 Nginx 配置。
+
 ## 许可证
 
-[MIT License](LICENSE)。使用和分发时保留许可声明；正式分发前由维护者填写 LICENSE 中的版权主体。
+[MIT License](LICENSE)。

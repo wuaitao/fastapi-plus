@@ -13,14 +13,24 @@ from app.core.config import Settings
 
 def create_engine(settings: Settings, *, null_pool: bool = False) -> AsyncEngine:
     """按配置创建异步引擎，可为短期 CLI 或任务资源禁用连接池"""
+    pool_options: dict[str, object] = {}
+    if null_pool:
+        pool_options["poolclass"] = NullPool
+    elif settings.database != "sqlite":
+        # SQLite 保留驱动的文件池/内存 StaticPool 选择；NullPool 不接受队列池参数。
+        pool_options.update(
+            pool_size=settings.database_pool_size,
+            max_overflow=settings.database_max_overflow,
+            pool_timeout=settings.database_pool_timeout,
+        )
     try:
         engine = create_async_engine(
             settings.sqlalchemy_url,
             echo=False,
             hide_parameters=True,
             pool_pre_ping=True,
-            pool_recycle=1800,
-            **({"poolclass": NullPool} if null_pool else {}),
+            pool_recycle=settings.database_pool_recycle,
+            **pool_options,
         )
     except ImportError:
         raise RuntimeError(f"数据库驱动未安装，请安装 {settings.database} 可选依赖") from None

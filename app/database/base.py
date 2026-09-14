@@ -16,5 +16,8 @@ class Base(DeclarativeBase):
     )
     # SQLite 只有精确的 INTEGER PRIMARY KEY 才能使用数据库自动生成主键。
     id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+        comment="数据库生成的整数主键",
     )

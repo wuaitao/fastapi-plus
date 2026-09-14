@@ -13,7 +13,7 @@ class _RedisFactory(Protocol):
     def from_url(self, url: str, **kwargs: object) -> "Redis": ...
 
 
-class _RedisPing(Protocol):
+class RedisPing(Protocol):
     async def ping(self) -> bool: ...
 
 
@@ -34,7 +34,7 @@ async def create_redis_client(settings: Settings) -> "Redis | None":
         socket_timeout=5,
     )
     try:
-        await cast(_RedisPing, client).ping()
+        await cast(RedisPing, client).ping()
     except CancelledError:
         await client.aclose()
         raise
