@@ -26,9 +26,7 @@ async def hash_password(password: str, hasher: PasswordHasher | None = None) -> 
     return await asyncio.to_thread((hasher or get_password_hasher()).hash, password)
 
 
-async def verify_password(
-    password: str, password_hash: str, hasher: PasswordHasher | None = None
-) -> bool:
+async def verify_password(password: str, password_hash: str, hasher: PasswordHasher | None = None) -> bool:
     """在线程中验证密码，不匹配或哈希无效时返回假值"""
     try:
         return await asyncio.to_thread(

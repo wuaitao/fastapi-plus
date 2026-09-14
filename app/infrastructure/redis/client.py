@@ -27,7 +27,7 @@ async def create_redis_client(settings: Settings) -> "Redis | None":
         raise RuntimeError("Redis 依赖未安装，请安装 redis extra") from None
     assert settings.redis_url is not None
     # redis-py 这些入口的可变参数未完整标注，在 SDK 边界收窄已核实的调用签名。
-    client = cast(_RedisFactory, Redis).from_url(
+    client = cast(_RedisFactory, Redis).from_url( # noqa
         settings.redis_url.get_secret_value(),
         decode_responses=True,
         socket_connect_timeout=5,

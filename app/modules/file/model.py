@@ -18,10 +18,8 @@ class FileRecord(TimestampMixin, Base):
     )
 
     backend: Mapped[str] = mapped_column(String(32), nullable=False, comment="存储后端标识")
-    key: Mapped[str] = mapped_column(String(255), nullable=False, comment="后端内唯一对象键")
-    original_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="原始文件名，仅供展示"
-    )
+    key: Mapped[str] = mapped_column(String(255), nullable=False, comment="唯一对象键")
+    original_name: Mapped[str] = mapped_column(String(255), nullable=False, comment="原始文件名，仅供展示")
     content_type: Mapped[str] = mapped_column(String(127), nullable=False, comment="文件 MIME 类型")
     size: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="文件大小（字节）")
     visibility: Mapped[Visibility] = mapped_column(

@@ -19,5 +19,5 @@ class Base(DeclarativeBase):
         BigInteger().with_variant(Integer, "sqlite"),
         primary_key=True,
         autoincrement=True,
-        comment="数据库生成的整数主键",
+        comment="主键",
     )

@@ -31,9 +31,7 @@ def upgrade(revision: Annotated[str, typer.Argument(help="目标 revision")] = "
 
 
 @app.command()
-def downgrade(
-    revision: Annotated[str, typer.Argument(help="目标 revision，例如 base 或 -1")],
-) -> None:
+def downgrade(revision: Annotated[str, typer.Argument(help="目标 revision，例如 base 或 -1")]) -> None:
     """显式回退到指定 revision"""
     with command_errors():
         load_settings()

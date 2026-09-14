@@ -43,7 +43,7 @@ async def current_heads(settings: Settings) -> tuple[str, ...]:
     try:
         async with engine.connect() as connection:
             return await connection.run_sync(
-                lambda connection: MigrationContext.configure(connection).get_current_heads()
+                lambda connection: MigrationContext.configure(connection).get_current_heads()  # type: ignore
             )
     finally:
         await engine.dispose()
