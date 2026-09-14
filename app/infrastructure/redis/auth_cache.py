@@ -25,16 +25,16 @@ class RedisAuthUserCache:
         # 版本号隔离后续快照格式变化；不同应用/环境须配置独立前缀。
         self.prefix = f"{prefix}:v1:"
 
-    async def get(self, user_id: int) -> AuthUserSnapshot | None:
+    async def get(self, user_id: int, auth_id: str) -> AuthUserSnapshot | None:
         """读取并校验快照；限时失败回源，命中不延长有效期"""
         try:
             async with asyncio.timeout(0.2):
-                value = await self.client.get(f"{self.prefix}{user_id}")
+                value = await self.client.get(f"{self.prefix}{user_id}:{auth_id}")
             if value is None:
                 return None
             user = AuthUserSnapshot.model_validate_json(value)
-            if user.id != user_id:
-                raise ValueError("缓存用户 ID 不匹配")
+            if user.id != user_id or user.auth_id != auth_id:
+                raise ValueError("缓存认证身份不匹配")
             return user
         except Exception:
             # 不记录缓存正文、连接信息或异常文本；取消信号仍向上传播。
@@ -46,7 +46,7 @@ class RedisAuthUserCache:
         try:
             async with asyncio.timeout(0.2):
                 await self.client.set(
-                    f"{self.prefix}{user.id}", user.model_dump_json(), ex=self.ttl
+                    f"{self.prefix}{user.id}:{user.auth_id}", user.model_dump_json(), ex=self.ttl
                 )
         except Exception:
             logger.warning("auth.cache_write_failed")

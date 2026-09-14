@@ -52,7 +52,7 @@
 └── LICENSE
 ```
 
-运行时的 `data/`（数据库、文件）和 `logs/`（可选日志）不进入版本控制。`tests/` 包含测试基建，按实际业务继续添加用例。
+运行时的 `data/`（数据库、文件）和 `logs/`（可选日志）不进入版本控制。`tests/` 仅保留隔离配置的基建，不保留模板阶段测试，按实际业务添加用例。
 
 ## 安装与启动
 
@@ -79,7 +79,7 @@ uv run uvicorn app.main:app --reload
 | 地址 | 用途 |
 | --- | --- |
 | `http://127.0.0.1:8000/health` | 存活检查，返回 `{"status":"ok"}` |
-| `http://127.0.0.1:8000/health/ready` | 数据库与已启用 Redis 就绪检查，失败返回 503 |
+| `http://127.0.0.1:8000/health/ready` | 数据库与强依赖 Redis 就绪检查，失败返回 503 |
 | `http://127.0.0.1:8000/docs` | Swagger UI，可直接调试接口 |
 | `http://127.0.0.1:8000/redoc` | ReDoc 接口文档 |
 | `http://127.0.0.1:8000/openapi.json` | OpenAPI 定义 |
@@ -124,6 +124,7 @@ uv run uvicorn app.main:app --reload
 | `LOG_FILE_MAX_BYTES` | `10485760`，单个日志文件轮转阈值，必须为正整数 |
 | `LOG_FILE_BACKUP_COUNT` | `5`，轮转备份数量，至少为 1 |
 | `REDIS_ENABLED` / `CELERY_ENABLED` | `false`，连接配置见下文 |
+| `REDIS_REQUIRED` | `false`，Redis 默认可降级；设为 `true` 后要求启动及就绪时可用，登录限流启用时自动强制要求 |
 
 所有相对路径均相对进程工作目录，Web、CLI 和 Worker 应在项目根目录启动。开发也建议配置固定随机 `JWT_SECRET`，否则重启会使旧令牌失效；多个进程必须使用相同密钥。
 
@@ -177,7 +178,7 @@ logger.info("order.created", order_id=order.id)
 
 不要记录密码、Token、完整请求体、SQL 参数或签名 URL。未知异常不会输出原始异常文本和局部变量；日志脱敏是兜底，业务仍须选择安全字段。开启文件输出后需确保目录可写，日志文件不要对外公开。
 
-`fastplus doctor` 只读检查数据库连接、迁移状态、存储目录和已启用组件，不创建数据库或修复目录；开启文件日志时，命令的日志初始化仍会创建日志目录/文件。`/health` 仅表示进程存活；`/health/ready` 在限时内通过现有连接池执行 `SELECT 1`，并检查已启用 Redis，返回 200 或不带底层错误信息的 503。它不核对迁移版本或检查云存储、Broker，也不保证后续业务成功；发布前仍需显式迁移并运行 `doctor`。SQLite 应先初始化数据库，普通应用连接会按驱动行为创建缺失文件。
+`fastplus doctor` 只读检查数据库连接、迁移状态、存储目录和已启用组件，不创建数据库或修复目录；开启文件日志时，命令的日志初始化仍会创建日志目录/文件。`/health` 仅表示进程存活；`/health/ready` 在限时内通过现有连接池执行 `SELECT 1`，并在 `REDIS_REQUIRED=true` 或开启登录限流时检查 Redis，返回 200 或不带底层错误信息的 503。仅用于可降级缓存的 Redis 不影响就绪状态，但 `doctor` 仍检查其连接并报告故障。readiness 不核对迁移版本或检查云存储、Broker，也不保证后续业务成功；发布前仍需显式迁移并运行 `doctor`。SQLite 应先初始化数据库，普通应用连接会按驱动行为创建缺失文件。
 
 ## 接口使用
 
@@ -192,6 +193,8 @@ logger.info("order.created", order_id=order.id)
 JSON 业务接口使用 `code/message/data`，同时保留真实 HTTP 状态；错误额外包含 `request_id`。输入校验为 422，未认证为 401，无权限为 403。数据库 ID 在响应中序列化为字符串，分页参数为 `page`、`size`，最大每页 100 条。
 
 用户管理要求超级管理员，禁止自删。刷新接口接收 `{"refresh_token":"..."}`；默认令牌撤销使用 `NullTokenStore`，退出后客户端删除两类令牌，服务端旧令牌仍有效至到期。需要强制退出或刷新防重放时，按业务实现有状态策略。
+
+JWT 主体由用户 ID 和创建账户时生成的随机 `auth_id` 共同组成，认证时同时校验；该标识不接受 API 输入修改。SQLite 用户表启用显式 `AUTOINCREMENT`，防止删除后自动复用 ID，使短 TTL 身份快照也不会关联到新账户的资源。原始 SQL 创建用户时须生成独立的 32 位十六进制认证标识，并维护时间字段；不要手动复用用户 ID 或重置用户自增序列。
 
 文件上传使用 multipart 的 `file` 字段和可选 `visibility`（`private` / `public`），默认私有。私有元数据和下载仅所有者或超级管理员可访问；公开文件可匿名读取，删除仍需所有者或管理员权限。支持 txt/pdf/png/jpg/jpeg/bin，扩展名与 MIME 对应关系在 [FileService](app/modules/file/service.py) 中维护。
 
@@ -226,7 +229,7 @@ PostgreSQL 使用 `DATABASE=postgresql` 和 `postgresql+asyncpg://...` 连接串
 
 自动生成的迁移必须检查后再执行。应用启动不自动建表、迁移或初始化账号。已应用的迁移应保留，模型变化通过新增迁移表达。
 
-表及字段附中文 `comment`，通过 `0003_add_comments` 为已有 PostgreSQL/MySQL 补齐注释。SQLite 不支持持久化表/列注释，该迁移只推进版本，不重建表；模型中的注释仍可供开发工具使用。
+模板仅保留 `0001_create_users`、`0002_create_files` 两个初始建表迁移，直接包含认证标识、约束及中文表/字段 `comment`。SQLite 不支持持久化表/列注释，模型注释仍可供开发工具使用。实际业务开始使用后，数据库变更再新增迁移。
 
 连接池按**进程**创建，Web 连接预算上限为 `实例数 × Worker 数 × (DATABASE_POOL_SIZE + DATABASE_MAX_OVERFLOW)`，还要给 CLI、Celery、迁移、监控及其他应用预留连接。默认 4 Worker 的上限是 60，连接按需创建，不代表启动就占满 60。例如 4 Worker 配置 `3 + 2`，Web 上限为 20；按实际并发与数据库容量调整。SQLite 保留驱动默认池策略，忽略 size/overflow/timeout；CLI 和短期任务使用 NullPool 时也不传队列池参数。`POOL_TIMEOUT` 不是查询执行超时，`POOL_RECYCLE` 也不是空闲连接自动关闭时间。
 
@@ -263,16 +266,19 @@ STORAGE_COS__REGION=ap-guangzhou
 ```dotenv
 REDIS_ENABLED=true
 REDIS_URL=redis://localhost:6379/0
+REDIS_REQUIRED=false
 AUTH_CACHE_ENABLED=true
 AUTH_CACHE_TTL=30
 AUTH_CACHE_PREFIX=fastplus:auth
 ```
 
-只有两个开关同时开启才启用缓存；Redis 关闭时，即使 `AUTH_CACHE_ENABLED=true` 也直接查库。缓存只替代 Bearer 认证中的用户查询，JWT 签名、有效期、用途及令牌撤销契约仍逐次检查；用户名密码登录、刷新和退出接口始终查询数据库。Redis 仅保存用户 ID、用户名、邮箱、启用/管理员状态和时间字段，不保存密码哈希、Token 或完整 ORM 对象。
+只有 `REDIS_ENABLED` 和 `AUTH_CACHE_ENABLED` 同时开启才启用缓存；Redis 关闭时，即使 `AUTH_CACHE_ENABLED=true` 也直接查库。缓存只替代 Bearer 认证中的用户查询，JWT 签名、有效期、用途及令牌撤销契约仍逐次检查；用户名密码登录、刷新和退出接口始终查询数据库。Redis 仅保存用户 ID、认证标识、用户名、邮箱、启用/管理员状态和时间字段，不保存密码哈希、Token 或完整 ORM 对象；缓存键同时包含用户 ID 和认证标识。
 
 快照使用固定短 TTL，命中不续期；用户禁用、删除、权限和资料变更依靠过期后重新查询生效，不主动清缓存，因此存在短暂状态滞后（通常一个 TTL，进行中的旧查询回填可能延后）。需要立即反映数据库状态时设 `AUTH_CACHE_ENABLED=false`。各实例共用同一 Redis 与前缀，不同业务数据库和环境必须隔离前缀；Redis 内容属于受信任的身份数据，应限制读写权限。
 
-缓存未命中、格式损坏、读取异常或单次操作超过 200 毫秒时回源数据库；写入失败仅记录安全事件，不改变已完成的认证结果，不缓存不存在或已禁用用户。应用启动仍会检查已启用 Redis，就绪探针仍要求其可用；缓存降级不改变登录限流的 Redis 故障返回 503 策略。
+缓存未命中、格式损坏、读取异常或单次操作超过 200 毫秒时回源数据库；写入失败仅记录安全事件，不改变已完成的认证结果，不缓存不存在或已禁用用户。
+
+`REDIS_REQUIRED=false` 且未开启登录限流时，Web 创建可按需连接的 Redis 客户端，Redis 不可用也能启动，readiness 不因缓存故障摘除实例；后续请求会重新尝试连接。业务必须依赖 Redis 时设置 `REDIS_REQUIRED=true`。开启登录限流会自动要求 Redis 在启动及就绪时可用，运行期限流故障仍返回 503，不因缓存降级而放行。URL 和可选依赖配置仍须正确，`doctor` 始终实际探测已启用 Redis。
 
 后台任务使用 `uv sync --locked --extra celery`，配置：
 
@@ -328,10 +334,11 @@ solo 模式不提供 prefork 的软/硬任务超时保障。Web 不会自动启�
 uv run --no-sync ruff check .
 uv run --no-sync ruff format --check .
 uv run --no-sync pyright
+# 添加业务测试后执行；空目录退出码 5 表示未收集到测试。
 uv run --no-sync pytest
 ```
 
-测试使用临时目录、独立配置和 SQLite，Redis 限流脚本使用 fakeredis + Lua 模拟器，不读取开发者 `.env` 或操作生产资源。PostgreSQL/MySQL 注释迁移验证离线 SQL；目标数据库与真实 Redis 仍需在部署环境验证。GitHub Actions 在 push / pull request 执行锁定安装、Ruff lint/format、严格 Pyright 和 Pytest。
+模板有意不保留测试用例；现有 `conftest.py` 提供临时目录、独立配置和 SQLite 基建，供业务测试复用，不读取开发者 `.env` 或操作生产资源。GitHub Actions 在 push / pull request 执行锁定安装、Ruff lint/format、严格 Pyright 和 Pytest；仅对 pytest 退出码 5 输出“尚无业务测试”提示，真实测试失败、收集错误和中断仍阻断 CI。空目录不代表测试通过；目标数据库和实际启用的外部组件需在部署环境验证。
 
 ## 部署
 

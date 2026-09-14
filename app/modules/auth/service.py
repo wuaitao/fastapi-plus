@@ -1,5 +1,7 @@
 """认证业务复用用户查询与安全能力，不依赖 HTTP 入口"""
 
+import re
+
 from argon2 import PasswordHasher
 
 from app.core.exceptions import AuthenticationException, AuthorizationException
@@ -39,7 +41,7 @@ class AuthService:
         )
         if not valid or user is None or not user.is_active:
             raise AuthenticationException()
-        return self.token_provider.create_pair(str(user.id))
+        return self.token_provider.create_pair(f"{user.id}:{user.auth_id}")
 
     async def _authenticate(
         self, token: str, token_type: TokenType, *, use_cache: bool = False
@@ -48,21 +50,23 @@ class AuthService:
         claims = self.token_provider.decode_token(token, token_type)
         if await self.token_store.is_revoked(claims.jti):
             raise AuthenticationException()
-        # sub 是字符串，但用户主键必须是数据库可接受的正整数，避免溢出导致 500。
-        if not claims.sub.isascii() or not claims.sub.isdecimal() or len(claims.sub) > 19:
+        # 主键用于定位，随机认证标识用于区分账户身份，两者必须同时匹配。
+        identity = re.fullmatch(r"([1-9][0-9]{0,18}):([0-9a-f]{32})", claims.sub)
+        if identity is None:
             raise AuthenticationException()
-        user_id = int(claims.sub)
+        user_id = int(identity[1])
+        auth_id = identity[2]
         if not 0 < user_id <= 9223372036854775807:
             raise AuthenticationException()
         # 每次先验签并检查撤销状态；缓存只替代用户查询，不能替代令牌校验。
         cache = self.user_cache if use_cache else None
-        snapshot = await cache.get(user_id) if cache is not None else None
+        snapshot = await cache.get(user_id, auth_id) if cache is not None else None
         if snapshot is not None:
             # 保持现有身份依赖的 User 接口；该对象不含密码，也不得用于持久化。
             user = User(**snapshot.model_dump())
         else:
             user = await self.repository.get(user_id)
-        if user is None:
+        if user is None or user.auth_id != auth_id:
             raise AuthenticationException()
         if not user.is_active:
             raise AuthorizationException(USER_DISABLED)
@@ -74,7 +78,7 @@ class AuthService:
         """重新验证刷新令牌及用户状态，签发新令牌对"""
         user, _ = await self._authenticate(refresh_token, "refresh")
         # 默认不消费旧 refresh token；轮换与防重放需要有状态存储。
-        return self.token_provider.create_pair(str(user.id))
+        return self.token_provider.create_pair(f"{user.id}:{user.auth_id}")
 
     async def logout(self, access_token: str) -> None:
         """验证访问令牌并调用撤销契约，默认空实现不撤销服务器令牌"""

@@ -22,4 +22,15 @@ jobs:
       - run: uv run --no-sync ruff check .
       - run: uv run --no-sync ruff format --check .
       - run: uv run --no-sync pyright
-      - run: uv run --no-sync pytest
+      - name: Pytest（允许模板尚无测试）
+        shell: python
+        run: |
+          import subprocess
+          import sys
+
+          # 仅把未收集到测试视为模板空目录；真实失败、收集错误和中断继续阻断 CI。
+          result = subprocess.run(["uv", "run", "--no-sync", "pytest"], check=False)
+          if result.returncode == 5:
+              print("::notice::尚无业务测试，本步骤未验证任何测试用例。")
+              sys.exit(0)
+          sys.exit(result.returncode)

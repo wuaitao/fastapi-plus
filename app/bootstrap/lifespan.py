@@ -24,7 +24,7 @@ async def startup(app: FastAPI) -> None:
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
-    app.state.redis = await create_redis_client(settings)
+    app.state.redis = await create_redis_client(settings, required=settings.redis_is_required)
     app.state.auth_user_cache = None
     if settings.auth_cache_enabled and app.state.redis is not None:
         from app.infrastructure.redis.auth_cache import RedisAuthCommands, RedisAuthUserCache

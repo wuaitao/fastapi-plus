@@ -11,6 +11,7 @@ class AuthUserSnapshot(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid", strict=True)
 
     id: int = Field(gt=0, le=9223372036854775807)
+    auth_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     username: str
     email: str | None
     is_active: bool
@@ -20,7 +21,7 @@ class AuthUserSnapshot(BaseModel):
 
 
 class AuthUserCache(Protocol):
-    async def get(self, user_id: int) -> AuthUserSnapshot | None:
+    async def get(self, user_id: int, auth_id: str) -> AuthUserSnapshot | None:
         """读取快照；不存在、损坏或缓存不可用时返回空值以回源数据库"""
         ...
 

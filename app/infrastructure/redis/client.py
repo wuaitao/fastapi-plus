@@ -17,8 +17,8 @@ class RedisPing(Protocol):
     async def ping(self) -> bool: ...
 
 
-async def create_redis_client(settings: Settings) -> "Redis | None":
-    """按需创建并验证 Redis 客户端，失败时关闭连接池并隐藏底层错误"""
+async def create_redis_client(settings: Settings, *, required: bool = True) -> "Redis | None":
+    """创建 Redis 客户端；强依赖立即探测，可降级缓存按首个命令连接"""
     if not settings.redis_enabled:
         return None
     try:
@@ -33,6 +33,9 @@ async def create_redis_client(settings: Settings) -> "Redis | None":
         socket_connect_timeout=5,
         socket_timeout=5,
     )
+    if not required:
+        # 保留客户端以便后续请求重连；缓存适配器负责限时回源，关闭仍归生命周期管理。
+        return client
     try:
         await cast(RedisPing, client).ping()
     except CancelledError:
