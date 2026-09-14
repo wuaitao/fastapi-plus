@@ -14,7 +14,6 @@ from app.database.session import get_session, session_scope
 from app.modules.auth.service import AuthService
 from app.modules.user.model import User
 from app.modules.user.repository import UserRepository
-from app.providers.auth_cache import AuthUserCache
 from app.providers.token_store import TokenStore
 
 
@@ -28,7 +27,6 @@ def get_auth_service(
         cast(TokenProvider, request.app.state.token_provider),
         cast(TokenStore, request.app.state.token_store),
         cast(str, request.app.state.dummy_password_hash),
-        cast(AuthUserCache | None, request.app.state.auth_user_cache),
     )
 
 
@@ -36,7 +34,7 @@ AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 
 
 async def resolve_current_user(request: Request, token: str) -> User:
-    """优先使用已启用的快照缓存，未命中时用独立短 Session 查询用户"""
+    """每次使用独立短 Session 查询用户，及时反映已提交的身份状态变更"""
     # 身份查询在业务执行前关闭读事务，避免 SQLite 并发写入时升级认证读锁。
     # 返回不关联 Session 的用户快照；入口只读取身份字段，不借此对象修改用户。
     factory = cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)

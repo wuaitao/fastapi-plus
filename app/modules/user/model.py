@@ -15,7 +15,7 @@ class User(TimestampMixin, Base):
         UniqueConstraint("username", name="uq_users_username"),
         UniqueConstraint("email", name="uq_users_email"),
         UniqueConstraint("auth_id", name="uq_users_auth_id"),
-        # SQLite 不复用已删除 ID，避免短 TTL 身份快照关联到新用户的业务资源。
+        # SQLite 不自动复用已删除 ID，防止历史业务引用关联到新账号。
         {"comment": "用户账号与身份状态", "sqlite_autoincrement": True},
     )
 

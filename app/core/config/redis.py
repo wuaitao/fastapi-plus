@@ -9,8 +9,6 @@ from pydantic_settings import BaseSettings
 
 class RedisSettings(BaseSettings):
     redis_enabled: bool = False
-    # 缓存默认可降级；业务必须依赖 Redis 时显式开启，登录限流另行强制要求。
-    redis_required: bool = False
     redis_url: SecretStr | None = None
 
     @model_validator(mode="after")

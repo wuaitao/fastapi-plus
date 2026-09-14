@@ -37,7 +37,7 @@ class ReadinessResponse(BaseModel):
     responses={503: {"model": ReadinessResponse, "description": "Dependencies unavailable"}},
 )
 async def ready(request: Request, response: Response) -> ReadinessResponse:
-    """限时检查数据库及强依赖 Redis；可降级缓存故障不摘除实例"""
+    """限时检查现有数据库池与已启用 Redis，不运行迁移或写入业务数据"""
     settings = cast(Settings, request.app.state.settings)
     response.headers["Cache-Control"] = "no-store"
     try:
@@ -45,7 +45,7 @@ async def ready(request: Request, response: Response) -> ReadinessResponse:
         async with asyncio.timeout(settings.readiness_timeout):
             engine = cast(AsyncEngine, request.app.state.engine)
             await check_connection(engine)
-            if settings.redis_is_required:
+            if settings.redis_enabled:
                 await cast(RedisPing, request.app.state.redis).ping()
     except Exception:
         # 探针只返回健康状态，连接串、驱动异常和凭据不对外公开。

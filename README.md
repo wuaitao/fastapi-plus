@@ -12,6 +12,7 @@
 .
 ├── app/
 │   ├── main.py                    # Web 入口
+│   ├── run.py                     # IDE 断点调试入口
 │   ├── bootstrap/                 # 显式装配与生命周期
 │   │   ├── application.py         # create_app 应用工厂
 │   │   ├── lifespan.py            # 创建和释放应用资源
@@ -52,7 +53,7 @@
 └── LICENSE
 ```
 
-运行时的 `data/`（数据库、文件）和 `logs/`（可选日志）不进入版本控制。`tests/` 仅保留隔离配置的基建，不保留模板阶段测试，按实际业务添加用例。
+运行时的 `data/`（数据库、文件）和 `logs/`（可选日志）不进入版本控制。`tests/` 仅保留隔离配置的基建，后续按实际业务添加用例。
 
 ## 安装与启动
 
@@ -79,10 +80,12 @@ uv run uvicorn app.main:app --reload
 | 地址 | 用途 |
 | --- | --- |
 | `http://127.0.0.1:8000/health` | 存活检查，返回 `{"status":"ok"}` |
-| `http://127.0.0.1:8000/health/ready` | 数据库与强依赖 Redis 就绪检查，失败返回 503 |
+| `http://127.0.0.1:8000/health/ready` | 数据库与已启用 Redis 就绪检查，失败返回 503 |
 | `http://127.0.0.1:8000/docs` | Swagger UI，可直接调试接口 |
 | `http://127.0.0.1:8000/redoc` | ReDoc 接口文档 |
 | `http://127.0.0.1:8000/openapi.json` | OpenAPI 定义 |
+
+IDE 调试时选择项目 `.venv` 的 Python 解释器，直接右键运行或调试 `app/run.py`；也可执行 `uv run --no-sync python app/run.py`。该入口固定在项目根目录读取配置并解析相对路径，监听 `127.0.0.1:8000`，使用单进程且关闭自动重载，便于断点调试；数据库及管理员仍需按上述步骤初始化。
 
 这些 HTTP 文档入口由 FastAPI 生成，与仓库的 `docs/` 目录无关。
 
@@ -108,9 +111,6 @@ uv run uvicorn app.main:app --reload
 | `JWT_SECRET` | 开发未设置时生成实例级临时密钥；生产必须设置至少 32 字节随机秘密 |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30`，范围 1–1440 分钟 |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7`，范围 1–365 天 |
-| `AUTH_CACHE_ENABLED` | `false`；与 `REDIS_ENABLED` 同时开启才缓存认证用户，Redis 未开启时直接查库 |
-| `AUTH_CACHE_TTL` | `30` 秒，范围 1–300；固定有效期，命中不续期 |
-| `AUTH_CACHE_PREFIX` | `fastplus:auth`；同一应用/环境多实例共用，不同应用/环境必须隔离 |
 | `STORAGE_BACKEND` | `local`，可选 `oss`、`cos` |
 | `STORAGE_LOCAL_ROOT` | `data/storage` |
 | `FILE_MAX_SIZE` | `10485760` 字节，即 10 MiB |
@@ -124,7 +124,6 @@ uv run uvicorn app.main:app --reload
 | `LOG_FILE_MAX_BYTES` | `10485760`，单个日志文件轮转阈值，必须为正整数 |
 | `LOG_FILE_BACKUP_COUNT` | `5`，轮转备份数量，至少为 1 |
 | `REDIS_ENABLED` / `CELERY_ENABLED` | `false`，连接配置见下文 |
-| `REDIS_REQUIRED` | `false`，Redis 默认可降级；设为 `true` 后要求启动及就绪时可用，登录限流启用时自动强制要求 |
 
 所有相对路径均相对进程工作目录，Web、CLI 和 Worker 应在项目根目录启动。开发也建议配置固定随机 `JWT_SECRET`，否则重启会使旧令牌失效；多个进程必须使用相同密钥。
 
@@ -178,7 +177,7 @@ logger.info("order.created", order_id=order.id)
 
 不要记录密码、Token、完整请求体、SQL 参数或签名 URL。未知异常不会输出原始异常文本和局部变量；日志脱敏是兜底，业务仍须选择安全字段。开启文件输出后需确保目录可写，日志文件不要对外公开。
 
-`fastplus doctor` 只读检查数据库连接、迁移状态、存储目录和已启用组件，不创建数据库或修复目录；开启文件日志时，命令的日志初始化仍会创建日志目录/文件。`/health` 仅表示进程存活；`/health/ready` 在限时内通过现有连接池执行 `SELECT 1`，并在 `REDIS_REQUIRED=true` 或开启登录限流时检查 Redis，返回 200 或不带底层错误信息的 503。仅用于可降级缓存的 Redis 不影响就绪状态，但 `doctor` 仍检查其连接并报告故障。readiness 不核对迁移版本或检查云存储、Broker，也不保证后续业务成功；发布前仍需显式迁移并运行 `doctor`。SQLite 应先初始化数据库，普通应用连接会按驱动行为创建缺失文件。
+`fastplus doctor` 只读检查数据库连接、迁移状态、存储目录和已启用组件，不创建数据库或修复目录；开启文件日志时，命令的日志初始化仍会创建日志目录/文件。`/health` 仅表示进程存活；`/health/ready` 在限时内通过现有连接池执行 `SELECT 1`，并在 `REDIS_ENABLED=true` 时检查 Redis，返回 200 或不带底层错误信息的 503。readiness 不核对迁移版本或检查云存储、Broker，也不保证后续业务成功；发布前仍需显式迁移并运行 `doctor`。SQLite 应先初始化数据库，普通应用连接会按驱动行为创建缺失文件。
 
 ## 接口使用
 
@@ -194,7 +193,7 @@ JSON 业务接口使用 `code/message/data`，同时保留真实 HTTP 状态；�
 
 用户管理要求超级管理员，禁止自删。刷新接口接收 `{"refresh_token":"..."}`；默认令牌撤销使用 `NullTokenStore`，退出后客户端删除两类令牌，服务端旧令牌仍有效至到期。需要强制退出或刷新防重放时，按业务实现有状态策略。
 
-JWT 主体由用户 ID 和创建账户时生成的随机 `auth_id` 共同组成，认证时同时校验；该标识不接受 API 输入修改。SQLite 用户表启用显式 `AUTOINCREMENT`，防止删除后自动复用 ID，使短 TTL 身份快照也不会关联到新账户的资源。原始 SQL 创建用户时须生成独立的 32 位十六进制认证标识，并维护时间字段；不要手动复用用户 ID 或重置用户自增序列。
+JWT 主体由用户 ID 和创建账户时生成的随机 `auth_id` 共同组成，认证时同时校验；该标识不接受 API 输入修改。SQLite 用户表启用显式 `AUTOINCREMENT`，防止删除后自动复用 ID，避免历史业务引用关联到新账户的资源。原始 SQL 创建用户时须生成独立的 32 位十六进制认证标识，并维护时间字段；不要手动复用用户 ID 或重置用户自增序列。
 
 文件上传使用 multipart 的 `file` 字段和可选 `visibility`（`private` / `public`），默认私有。私有元数据和下载仅所有者或超级管理员可访问；公开文件可匿名读取，删除仍需所有者或管理员权限。支持 txt/pdf/png/jpg/jpeg/bin，扩展名与 MIME 对应关系在 [FileService](app/modules/file/service.py) 中维护。
 
@@ -259,26 +258,15 @@ STORAGE_COS__REGION=ap-guangzhou
 
 ### Redis / Celery
 
-应用缓存客户端使用 `uv sync --locked --extra redis`，配合 `REDIS_ENABLED=true`、`REDIS_URL=redis://localhost:6379/0`。
+登录限流使用 `uv sync --locked --extra redis`，配合 `REDIS_ENABLED=true`、`REDIS_URL=redis://localhost:6379/0` 和 `LOGIN_RATE_LIMIT_ENABLED=true`。仅使用 Celery 时无需开启应用 Redis 客户端。
 
-可选认证用户缓存配置：
+已启用的 Redis 在 Web 启动、readiness 和 `doctor` 中均检查连接；启动连接失败会阻止启动，运行期限流故障返回 503。
 
-```dotenv
-REDIS_ENABLED=true
-REDIS_URL=redis://localhost:6379/0
-REDIS_REQUIRED=false
-AUTH_CACHE_ENABLED=true
-AUTH_CACHE_TTL=30
-AUTH_CACHE_PREFIX=fastplus:auth
-```
+身份认证每次查询数据库，用户禁用、删除、权限和资料变更提交后，在后续请求的身份查询中生效；已经完成身份查询的在途请求不会被追溯中断。JWT 签名、有效期、用途和令牌撤销契约仍逐次检查。
 
-只有 `REDIS_ENABLED` 和 `AUTH_CACHE_ENABLED` 同时开启才启用缓存；Redis 关闭时，即使 `AUTH_CACHE_ENABLED=true` 也直接查库。缓存只替代 Bearer 认证中的用户查询，JWT 签名、有效期、用途及令牌撤销契约仍逐次检查；用户名密码登录、刷新和退出接口始终查询数据库。Redis 仅保存用户 ID、认证标识、用户名、邮箱、启用/管理员状态和时间字段，不保存密码哈希、Token 或完整 ORM 对象；缓存键同时包含用户 ID 和认证标识。
+此前未启用用户缓存时，数据库查询量不变；此前命中缓存的身份查询现在增加一次按用户主键查询，同时不再执行缓存读写及故障回源等待。高并发下应按实际负载评估数据库容量。
 
-快照使用固定短 TTL，命中不续期；用户禁用、删除、权限和资料变更依靠过期后重新查询生效，不主动清缓存，因此存在短暂状态滞后（通常一个 TTL，进行中的旧查询回填可能延后）。需要立即反映数据库状态时设 `AUTH_CACHE_ENABLED=false`。各实例共用同一 Redis 与前缀，不同业务数据库和环境必须隔离前缀；Redis 内容属于受信任的身份数据，应限制读写权限。
-
-缓存未命中、格式损坏、读取异常或单次操作超过 200 毫秒时回源数据库；写入失败仅记录安全事件，不改变已完成的认证结果，不缓存不存在或已禁用用户。
-
-`REDIS_REQUIRED=false` 且未开启登录限流时，Web 创建可按需连接的 Redis 客户端，Redis 不可用也能启动，readiness 不因缓存故障摘除实例；后续请求会重新尝试连接。业务必须依赖 Redis 时设置 `REDIS_REQUIRED=true`。开启登录限流会自动要求 Redis 在启动及就绪时可用，运行期限流故障仍返回 503，不因缓存降级而放行。URL 和可选依赖配置仍须正确，`doctor` 始终实际探测已启用 Redis。
+升级时从已有 `.env` 删除 `AUTH_CACHE_ENABLED`、`AUTH_CACHE_TTL`、`AUTH_CACHE_PREFIX` 和 `REDIS_REQUIRED`，否则严格配置校验会拒绝启动。若之前仅为用户缓存启用 Redis，可关闭 `REDIS_ENABLED`；仍使用登录限流时保持开启。旧认证缓存键按原有 TTL 自动过期，无需清空 Redis。
 
 后台任务使用 `uv sync --locked --extra celery`，配置：
 
@@ -338,7 +326,7 @@ uv run --no-sync pyright
 uv run --no-sync pytest
 ```
 
-模板有意不保留测试用例；现有 `conftest.py` 提供临时目录、独立配置和 SQLite 基建，供业务测试复用，不读取开发者 `.env` 或操作生产资源。GitHub Actions 在 push / pull request 执行锁定安装、Ruff lint/format、严格 Pyright 和 Pytest；仅对 pytest 退出码 5 输出“尚无业务测试”提示，真实测试失败、收集错误和中断仍阻断 CI。空目录不代表测试通过；目标数据库和实际启用的外部组件需在部署环境验证。
+现有 `conftest.py` 提供临时目录、独立配置和 SQLite 基建，供业务测试复用，不读取开发者 `.env` 或操作生产资源。GitHub Actions 在 push / pull request 执行锁定安装、Ruff lint/format、严格 Pyright 和 Pytest；仅对 pytest 退出码 5 输出“尚无业务测试”提示，真实测试失败、收集错误和中断仍阻断 CI。空目录不代表测试通过；目标数据库和实际启用的外部组件需在部署环境验证。
 
 ## 部署
 
@@ -396,7 +384,7 @@ uv sync --locked --extra metrics
 
 ### 按业务再补的能力
 
-Beat 调度、存储配额、业务审计日志和更严格的密码策略按业务引入。认证默认每次查询用户，启用可选缓存后的状态时效见 Redis 配置说明；CLI 已复用 8–128 字符密码校验，建议管理员使用密码管理器生成的长随机密码。没有定时任务时无需预置空调度器；引入 Beat 时必须单独部署且保持单调度实例、任务幂等。CSP、HSTS 和防嵌入响应头按实际 HTTPS/前端策略配置，不为通用 API 强制套用可能破坏文档页的策略。本项目不内置 Docker、Compose 或 Nginx 配置。
+Beat 调度、存储配额、业务审计日志和更严格的密码策略按业务引入。认证每次查询用户；CLI 已复用 8–128 字符密码校验，建议管理员使用密码管理器生成的长随机密码。没有定时任务时无需预置空调度器；引入 Beat 时必须单独部署且保持单调度实例、任务幂等。CSP、HSTS 和防嵌入响应头按实际 HTTPS/前端策略配置，不为通用 API 强制套用可能破坏文档页的策略。本项目不内置 Docker、Compose 或 Nginx 配置。
 
 ## 许可证
 
