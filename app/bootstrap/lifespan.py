@@ -25,6 +25,15 @@ async def startup(app: FastAPI) -> None:
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
     app.state.redis = await create_redis_client(settings)
+    app.state.auth_user_cache = None
+    if settings.auth_cache_enabled and app.state.redis is not None:
+        from app.infrastructure.redis.auth_cache import RedisAuthCommands, RedisAuthUserCache
+
+        app.state.auth_user_cache = RedisAuthUserCache(
+            cast(RedisAuthCommands, app.state.redis),
+            ttl=settings.auth_cache_ttl,
+            prefix=settings.auth_cache_prefix,
+        )
     app.state.celery = create_celery_app(settings)
     if app.state.celery is not None:
         # 已启用的 Broker 在启动时检查；阻塞客户端不得占用 Web 事件循环。
