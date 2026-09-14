@@ -63,7 +63,7 @@
 uv sync --locked
 ```
 
-按需将 `.env.example` 复制为 `.env`，修改项目名称、数据库和日志等配置。PowerShell 使用 `Copy-Item .env.example .env`，Linux/macOS 使用 `cp .env.example .env`；已有 `.env` 时直接编辑。
+按需将 `.env.example` 复制为 `.env`，修改项目名称、数据库和日志等配置。
 
 首次初始化需创建数据目录，再显式迁移和创建管理员：
 
@@ -85,7 +85,7 @@ uv run uvicorn app.main:app --reload
 | `http://127.0.0.1:8000/redoc` | ReDoc 接口文档 |
 | `http://127.0.0.1:8000/openapi.json` | OpenAPI 定义 |
 
-IDE 调试时选择项目 `.venv` 的 Python 解释器，直接右键运行或调试 `app/run.py`；也可执行 `uv run --no-sync python app/run.py`。该入口固定在项目根目录读取配置并解析相对路径，监听 `127.0.0.1:8000`，使用单进程且关闭自动重载，便于断点调试；数据库及管理员仍需按上述步骤初始化。
+IDE 调试时选择项目 `.venv` 的 Python 解释器，直接右键运行或调试 `app/run.py`；也可执行 `uv run --no-sync python app/run.py`。
 
 这些 HTTP 文档入口由 FastAPI 生成，与仓库的 `docs/` 目录无关。
 
@@ -261,12 +261,6 @@ STORAGE_COS__REGION=ap-guangzhou
 登录限流使用 `uv sync --locked --extra redis`，配合 `REDIS_ENABLED=true`、`REDIS_URL=redis://localhost:6379/0` 和 `LOGIN_RATE_LIMIT_ENABLED=true`。仅使用 Celery 时无需开启应用 Redis 客户端。
 
 已启用的 Redis 在 Web 启动、readiness 和 `doctor` 中均检查连接；启动连接失败会阻止启动，运行期限流故障返回 503。
-
-身份认证每次查询数据库，用户禁用、删除、权限和资料变更提交后，在后续请求的身份查询中生效；已经完成身份查询的在途请求不会被追溯中断。JWT 签名、有效期、用途和令牌撤销契约仍逐次检查。
-
-此前未启用用户缓存时，数据库查询量不变；此前命中缓存的身份查询现在增加一次按用户主键查询，同时不再执行缓存读写及故障回源等待。高并发下应按实际负载评估数据库容量。
-
-升级时从已有 `.env` 删除 `AUTH_CACHE_ENABLED`、`AUTH_CACHE_TTL`、`AUTH_CACHE_PREFIX` 和 `REDIS_REQUIRED`，否则严格配置校验会拒绝启动。若之前仅为用户缓存启用 Redis，可关闭 `REDIS_ENABLED`；仍使用登录限流时保持开启。旧认证缓存键按原有 TTL 自动过期，无需清空 Redis。
 
 后台任务使用 `uv sync --locked --extra celery`，配置：
 
