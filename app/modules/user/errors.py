@@ -7,10 +7,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.exceptions import ErrorDescriptor
 
-USER_ALREADY_EXISTS = ErrorDescriptor(30001, "USER_ALREADY_EXISTS", "User already exists", 409)
-USER_NOT_FOUND = ErrorDescriptor(30002, "USER_NOT_FOUND", "User not found", 404)
-USER_DISABLED = ErrorDescriptor(30003, "USER_DISABLED", "User disabled", 403)
-USER_SELF_DELETE = ErrorDescriptor(30004, "USER_SELF_DELETE", "Cannot delete yourself", 403)
+USER_ALREADY_EXISTS = ErrorDescriptor(30001, "USER_ALREADY_EXISTS", "用户名或邮箱已存在", 409)
+USER_NOT_FOUND = ErrorDescriptor(30002, "USER_NOT_FOUND", "用户不存在", 404)
+USER_DISABLED = ErrorDescriptor(30003, "USER_DISABLED", "用户已停用", 403)
+USER_SELF_DELETE = ErrorDescriptor(30004, "USER_SELF_DELETE", "不能删除自己", 403)
 
 
 def is_user_unique_violation(error: IntegrityError) -> bool:

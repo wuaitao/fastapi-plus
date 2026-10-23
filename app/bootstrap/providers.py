@@ -16,15 +16,15 @@ from app.providers.token_store import NullTokenStore
 def create_storage_registry(settings: Settings) -> StorageRegistry:
     """注册本地及已配置的云存储，保留按历史后端读取的能力"""
     registry = StorageRegistry(settings.storage_backend)
-    registry.register("local", LocalStorage(settings.storage_local_root))  # type: ignore
+    registry.register("local", LocalStorage(settings.storage_local_root))
     if settings.storage_oss is not None:
         from app.infrastructure.storage.aliyun_oss import AliyunOSSStorage
 
-        registry.register("oss", AliyunOSSStorage(settings.storage_oss))  # type: ignore
+        registry.register("oss", AliyunOSSStorage(settings.storage_oss))
     if settings.storage_cos is not None:
         from app.infrastructure.storage.tencent_cos import TencentCOSStorage
 
-        registry.register("cos", TencentCOSStorage(settings.storage_cos))  # type: ignore
+        registry.register("cos", TencentCOSStorage(settings.storage_cos))
     registry.get()
     return registry
 

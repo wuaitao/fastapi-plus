@@ -226,7 +226,7 @@ PostgreSQL 使用 `DATABASE=postgresql` 和 `postgresql+asyncpg://...` 连接串
 | `uv run --no-sync fastplus db downgrade -- -1` | 显式回退一个版本，可能删除数据 |
 | `uv run --no-sync fastplus create-superuser` | 交互创建管理员 |
 
-自动生成的迁移必须检查后再执行。应用启动不自动建表、迁移或初始化账号。已应用的迁移应保留，模型变化通过新增迁移表达。
+自动生成的迁移必须检查后再执行。`alembic.ini` 配置了 post-write hook，新迁移文件会自动经过 `ruff check --fix` 与 `ruff format`，因此生成迁移需要 dev 依赖（Ruff）；`alembic.ini` 会按系统默认编码读取，请保持纯 ASCII。应用启动不自动建表、迁移或初始化账号。已应用的迁移应保留，模型变化通过新增迁移表达。
 
 模板仅保留 `0001_create_users`、`0002_create_files` 两个初始建表迁移，直接包含认证标识、约束及中文表/字段 `comment`。SQLite 不支持持久化表/列注释，模型注释仍可供开发工具使用。实际业务开始使用后，数据库变更再新增迁移。
 
@@ -320,7 +320,7 @@ uv run --no-sync pyright
 uv run --no-sync pytest
 ```
 
-现有 `conftest.py` 提供临时目录、独立配置和 SQLite 基建，供业务测试复用，不读取开发者 `.env` 或操作生产资源。GitHub Actions 在 push / pull request 执行锁定安装、Ruff lint/format、严格 Pyright 和 Pytest；仅对 pytest 退出码 5 输出“尚无业务测试”提示，真实测试失败、收集错误和中断仍阻断 CI。空目录不代表测试通过；目标数据库和实际启用的外部组件需在部署环境验证。
+现有 `conftest.py` 提供临时目录、独立配置和 SQLite 基建，供业务测试复用，不读取开发者 `.env` 或操作生产资源。HTTP 测试使用 `fastapi.testclient.TestClient`，它依赖 dev 组中的 `httpx2`（Starlette 1.x 已弃用旧版 `httpx`）。GitHub Actions 在 push / pull request 执行锁定安装、Ruff lint/format、严格 Pyright 和 Pytest；仅对 pytest 退出码 5 输出“尚无业务测试”提示，真实测试失败、收集错误和中断仍阻断 CI。空目录不代表测试通过；目标数据库和实际启用的外部组件需在部署环境验证。
 
 ## 部署
 
@@ -349,7 +349,7 @@ Uvicorn 原生支持多 Worker，使用命令行配置即可，不需要在应�
 uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-`--workers` 与 `--reload` 互斥。每个进程会独立启动 lifespan、连接池和可选客户端，必须共享固定 `JWT_SECRET`，并取消共享 `LOG_FILE_PATH`。生产并发写入应使用 PostgreSQL/MySQL；SQLite 允许多进程访问，但写锁竞争使它不适合作为多 Worker 并发写入方案。“SQLite 绝对不能多 Worker”并不准确。
+`--workers` 与 `--reload` 互斥。每个进程会独立启动 lifespan、连接池和可选客户端，必须共享固定 `JWT_SECRET`，并取消共享 `LOG_FILE_PATH`。生产并发写入应使用 PostgreSQL/MySQL；SQLite 允许多进程访问，但写锁竞争使它不适合多 Worker 并发写入。
 
 同机多 Worker 可以访问同一个 Local 目录；跨机器多实例必须使用共享存储或 OSS/COS，否则其他实例无法读取已上传文件。文件存储和数据库自身的高可用、备份仍由部署环境负责。
 
@@ -372,7 +372,7 @@ uv sync --locked --extra metrics
 | `db_pool_checked_out` | 当前进程借出的连接数 |
 | `db_pool_size` | 常驻队列池容量，不含 overflow；内存 SQLite/无队列池时为 0 |
 
-路由标签使用 `/users/{user_id}` 这类模板，未知路径归为 `unmatched`，不包含实际 ID、query、IP 或 Token。探针和 `/metrics` 不计入 HTTP 指标。延迟包含响应流及请求结束阶段，不等同于数据库耗时；流开始后失败仍保留已发送的状态码，排障需结合错误日志。
+路由标签使用 `/api/v1/users/{id}` 这类模板，未知路径归为 `unmatched`，不包含实际 ID、query、IP 或 Token。探针和 `/metrics` 不计入 HTTP 指标。延迟包含响应流及请求结束阶段，不等同于数据库耗时；流开始后失败仍保留已发送的状态码，排障需结合错误日志。
 
 例如跨实例 P99：`histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))`。HTTP 5xx 比例：`sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))`，无请求时分母为零，告警规则需处理低流量。抓取、保存和告警规则由实际监控平台配置；Celery 积压、数据库服务端与主机磁盘指标应由相应 exporter 提供，本项目不启动监控服务器。
 

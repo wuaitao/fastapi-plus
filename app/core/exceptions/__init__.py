@@ -8,6 +8,7 @@ from app.core.exceptions.base import (
     InfrastructureException,
 )
 from app.core.exceptions.common import (
+    BODY_TOO_LARGE,
     COMMON_ERRORS,
     HTTP_ERROR,
     INFRASTRUCTURE_UNAVAILABLE,
@@ -32,6 +33,7 @@ __all__ = [
     "HTTP_ERROR",
     "NOT_FOUND",
     "METHOD_NOT_ALLOWED",
+    "BODY_TOO_LARGE",
     "INFRASTRUCTURE_UNAVAILABLE",
     "INVALID_CREDENTIALS",
     "PERMISSION_DENIED",

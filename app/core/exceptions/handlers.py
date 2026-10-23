@@ -71,7 +71,7 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
         issues.append(
             ValidationIssue(
                 field=redact_text(".".join(str(part) for part in location)),
-                message="Field required" if error_type == "missing" else "Invalid value",
+                message="缺少必填字段" if error_type == "missing" else "字段值无效",
                 type=redact_text(error_type),
             )
         )

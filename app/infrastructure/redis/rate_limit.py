@@ -11,7 +11,9 @@ from app.core.config import Settings
 from app.core.exceptions import INFRASTRUCTURE_UNAVAILABLE, ErrorDescriptor
 from app.core.exceptions.handlers import error_response
 
-LOGIN_RATE_LIMITED = ErrorDescriptor(20002, "LOGIN_RATE_LIMITED", "Too many login attempts", 429)
+LOGIN_RATE_LIMITED = ErrorDescriptor(
+    20002, "LOGIN_RATE_LIMITED", "登录尝试过于频繁，请稍后再试", 429
+)
 
 # 使用 Redis 时间消除应用实例时钟差异；扣减、补充和过期在一个脚本内原子执行。
 _TOKEN_BUCKET = """

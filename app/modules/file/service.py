@@ -122,11 +122,11 @@ class FileService:
             try:
                 await self.repository.session.rollback()
             except Exception:
-                logger.error("file_upload_rollback_failed", backend=backend, key=key)
+                logger.error("file.upload_rollback_failed", backend=backend, key=key)
             try:
                 await provider.delete(key, visibility=visibility)
             except Exception:
-                logger.error("file_upload_compensation_failed", backend=backend, key=key)
+                logger.error("file.upload_compensation_failed", backend=backend, key=key)
             raise
 
     @staticmethod
@@ -175,9 +175,9 @@ class FileService:
         except BaseException:
             # 数据库回滚不能恢复已删除的内容；保留元数据可重试清理，日志明确不一致。
             if object_deleted:
-                logger.error("file_delete_metadata_failed", backend=backend, key=key)
+                logger.error("file.delete_metadata_failed", backend=backend, key=key)
             try:
                 await self.repository.session.rollback()
             except Exception:
-                logger.error("file_delete_rollback_failed", backend=backend, key=key)
+                logger.error("file.delete_rollback_failed", backend=backend, key=key)
             raise

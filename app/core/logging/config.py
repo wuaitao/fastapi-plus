@@ -26,7 +26,7 @@ def configure_logging(settings: Settings) -> None:
     renderer = (
         structlog.processors.JSONRenderer(ensure_ascii=False)
         if log_format == "json"
-        else structlog.dev.ConsoleRenderer(pad_level=False, pad_event=False)
+        else structlog.dev.ConsoleRenderer(pad_level=False, pad_event_to=0)
     )
     handlers: dict[str, dict[str, object]] = {
         "console": {
@@ -95,6 +95,6 @@ def configure_logging(settings: Settings) -> None:
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,  # type: ignore
+        wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=False,
     )

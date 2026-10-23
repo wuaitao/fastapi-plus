@@ -1,7 +1,7 @@
 """创建、局部更新、查询和公开响应各自声明允许的字段"""
 
 from datetime import datetime
-from typing import Annotated, Self
+from typing import Annotated
 
 from pydantic import (
     BaseModel,
@@ -10,7 +10,7 @@ from pydantic import (
     Field,
     SecretStr,
     field_serializer,
-    model_validator,
+    field_validator,
 )
 
 Username = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$")]
@@ -33,14 +33,15 @@ class UserUpdate(BaseModel):
     email: Email | None = None
     is_active: bool | None = None
 
-    @model_validator(mode="after")
-    def reject_null_required_fields(self) -> Self:
+    @field_validator("username", "is_active", mode="before")
+    @classmethod
+    def reject_null(cls, value: object) -> object:
         """区分 PATCH 省略与显式空值，仅允许清空邮箱"""
-        # PATCH 省略字段表示保持原值；只有 email 允许通过显式 null 清空。
-        for name in ("username", "is_active"):
-            if name in self.model_fields_set and getattr(self, name) is None:
-                raise ValueError(f"{name} 不能为 null")
-        return self
+        # before 校验器只在请求显式提供字段时执行，省略字段仍保持原值；
+        # 字段级校验让 422 错误定位到具体字段。只有 email 允许通过 null 清空。
+        if value is None:
+            raise ValueError("字段不能为 null")
+        return value
 
 
 class UserQuery(BaseModel):

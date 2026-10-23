@@ -17,15 +17,30 @@ def upgrade() -> None:
     op.create_table(
         "users",
         sa.Column(
-            "id", sa.BigInteger().with_variant(sa.Integer(), "sqlite"), autoincrement=True, comment="主键"
+            "id",
+            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
+            autoincrement=True,
+            comment="主键",
         ),
         # 随机认证标识由应用创建用户时生成，原始 SQL 写入也须提供独立标识。
         sa.Column("auth_id", sa.String(32), nullable=False, comment="随机认证标识"),
         sa.Column("username", sa.String(64), nullable=False, comment="登录用户名"),
         sa.Column("email", sa.String(254), nullable=True, comment="邮箱，可为空"),
         sa.Column("password_hash", sa.String(255), nullable=False, comment="Argon2 密码哈希"),
-        sa.Column("is_active", sa.Boolean(), server_default=sa.true(), nullable=False, comment="账号是否启用"),
-        sa.Column("is_superuser", sa.Boolean(), server_default=sa.false(), nullable=False, comment="是否为超级管理员"),
+        sa.Column(
+            "is_active",
+            sa.Boolean(),
+            server_default=sa.true(),
+            nullable=False,
+            comment="账号是否启用",
+        ),
+        sa.Column(
+            "is_superuser",
+            sa.Boolean(),
+            server_default=sa.false(),
+            nullable=False,
+            comment="是否为超级管理员",
+        ),
         # 与 TimestampMixin 一致，存储无时区 UTC，由 ORM 维护时间值。
         sa.Column("created_at", sa.DateTime(), nullable=False, comment="创建时间（UTC）"),
         sa.Column("updated_at", sa.DateTime(), nullable=False, comment="更新时间（UTC）"),

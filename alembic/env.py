@@ -44,7 +44,7 @@ async def run_migrations_online() -> None:
     engine = create_engine(settings, null_pool=True)
     try:
         # 外层事务也覆盖 SQLite 的显式 BEGIN，确保版本号和 DDL 一起持久化。
-        async with engine.begin() as connection:  # type: ignore
+        async with engine.begin() as connection:
             await connection.run_sync(do_run_migrations)
     finally:
         await engine.dispose()

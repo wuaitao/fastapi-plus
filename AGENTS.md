@@ -76,7 +76,7 @@ uv run --no-sync fastplus db revision -m "describe change" --autogenerate
 uv run --no-sync fastplus db upgrade
 ```
 
-保留已有迁移，不重写已经应用的版本。数据库主键默认整数，按需在响应 Schema 中序列化为字符串。模型时间使用 `TimestampMixin` / `UTCDateTime`，写入值带时区；直接 SQL 写入需自行维护时间字段。
+新迁移文件由 `alembic.ini` 的 post-write hook 自动执行 Ruff 修正与格式化（需 dev 依赖）；`alembic.ini` 按系统默认编码读取，保持纯 ASCII。保留已有迁移，不重写已经应用的版本。数据库主键默认整数，按需在响应 Schema 中序列化为字符串。模型时间使用 `TimestampMixin` / `UTCDateTime`，写入值带时区；直接 SQL 写入需自行维护时间字段。
 
 请求和任务各有独立 Session，入口关闭资源，Service 完成事务。身份查询使用独立短 Session，返回用户快照；不要跨请求共享 Session，或通过身份快照修改用户。阻塞密码哈希和 SDK 调用复用已有线程边界；任务复用集中异步桥接，不在每个任务内另建事件循环。
 
@@ -108,7 +108,7 @@ CORS 默认关闭，只接受明确来源；新增方法/请求头时检查原�
 
 先说明任务假设、最小修改和验证方式。保持脚手架通用性，只增加当前业务确需的能力，不为未来需求预装服务、创建复杂 IoC 或通用 CRUD 框架。用户要求的新业务不受旧里程碑范围限制。
 
-行为修改在 `tests/` 添加对应业务测试，缺陷先复现再修复。可按 unit/integration/api 分层，目录按需创建；Repository 使用真实 SQLAlchemy，Local 使用临时文件系统，云 SDK 可在边界模拟。测试隔离 `.env`、Settings 缓存、进程日志与资源，不连接生产。
+行为修改在 `tests/` 添加对应业务测试，缺陷先复现再修复。可按 unit/integration/api 分层，目录按需创建；HTTP 测试用 `TestClient`（dev 依赖 `httpx2`）；Repository 使用真实 SQLAlchemy，Local 使用临时文件系统，云 SDK 可在边界模拟。测试隔离 `.env`、Settings 缓存、进程日志与资源，不连接生产。
 
 涉及模型时验证迁移，涉及 API 时检查实际响应和 OpenAPI，涉及外部服务时明确哪些做了真实验证。运行适用的 Ruff、Pyright、Pytest；没有业务测试时报告实际冒烟验证，不宣称全量测试通过。
 
